@@ -7,10 +7,19 @@ A comprehensive travel management system built with the MERN stack (MongoDB, Exp
 - User Authentication (Login/Register)
 - Admin Dashboard
 - Profile Management
-- Trip Planning Bot
+- Trip Planning Bot with AI-powered chat interface
+  - Modern dark mode support
+  - Real-time chat with typing indicators
+  - Quick action buttons for common queries
+  - Rich text responses with formatted content
 - Destination Management
 - Accommodation Management
 - Tour Package Management
+- Modern UI/UX with Material-UI components
+- Responsive design for all devices
+- Dark/Light mode support
+- Glass-morphism effects
+- 3D animations and transitions
 
 ## Project Structure
 
@@ -20,6 +29,12 @@ ceylon-circuit/
 │   ├── public/            # Static files
 │   ├── src/               # Source files
 │   │   ├── components/    # React components
+│   │   │   ├── auth/     # Authentication components
+│   │   │   ├── home/     # Home page components
+│   │   │   ├── layout/   # Layout components
+│   │   │   ├── profile/  # Profile components
+│   │   │   └── tripbot/  # Trip planning bot components
+│   │   │       └── chat/ # Chat interface components
 │   │   ├── redux/        # Redux state management
 │   │   ├── assets/       # Images and other assets
 │   │   └── App.js        # Main application component
@@ -35,7 +50,8 @@ ceylon-circuit/
 │   └── server.js        # Server entry point
 │
 ├── .gitignore           # Git ignore file
-└── README.md            # Project documentation
+├── LICENSE             # MIT License
+└── README.md           # Project documentation
 ```
 
 ## Prerequisites
@@ -73,19 +89,33 @@ ceylon-circuit/
 
 ## Running the Application
 
-1. Start the server:
+1. Start both server and client concurrently:
    ```bash
-   cd server
-   npm run dev
-   ```
-
-2. Start the client:
-   ```bash
-   cd client
    npm start
    ```
 
-The application will be available at `http://localhost:3000`
+The application will be available at:
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:5000`
+
+## Features in Detail
+
+### Trip Planning Bot
+- Modern chat interface with real-time responses
+- Dark/Light mode support
+- Quick action buttons for common queries
+- Rich text formatting for responses
+- Typing indicators
+- Smooth animations and transitions
+- Mobile-responsive design
+
+### UI/UX Improvements
+- Glass-morphism effects throughout the interface
+- 3D animations and transitions
+- Modern Material-UI components
+- Responsive design for all screen sizes
+- Improved accessibility
+- Better visual feedback for user interactions
 
 ## Admin Access
 
@@ -101,19 +131,6 @@ To create an admin user:
    - Email: admin@ceyloncircuit.com
    - Password: admin123
 
-## Available Scripts
-
-In the server directory:
-- `npm run dev`: Start the server in development mode
-- `npm start`: Start the server in production mode
-- `npm run seed:admin`: Create an admin user
-
-In the client directory:
-- `npm start`: Start the development server
-- `npm build`: Build the application for production
-- `npm test`: Run tests
-- `npm run eject`: Eject from Create React App
-
 ## Contributing
 
 1. Fork the repository
@@ -124,7 +141,7 @@ In the client directory:
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Team
 
