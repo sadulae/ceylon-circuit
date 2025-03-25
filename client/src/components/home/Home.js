@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Container, Typography, Button, Grid, Card, CardContent, useTheme } from '@mui/material';
+import { Box, Container, Typography, Button, Grid, Card, CardContent, useTheme, Avatar } from '@mui/material';
 import ExploreIcon from '@mui/icons-material/Explore';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -355,7 +355,7 @@ const Home = () => {
           position: 'relative',
           py: 10,
           overflow: 'hidden',
-          backgroundImage: 'linear-gradient(to right, rgba(14, 55, 78, 0.9), rgba(79, 209, 197, 0.8))',
+          backgroundImage: 'linear-gradient(135deg, #121212 0%, #1E2937 100%)',
           '&::before': {
             content: '""',
             position: 'absolute',
@@ -366,7 +366,18 @@ const Home = () => {
             backgroundImage: 'url("https://images.unsplash.com/photo-1578758837674-93ed0ab5fbab?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2071&q=80")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            opacity: 0.2,
+            opacity: 0.15,
+            zIndex: -1,
+            filter: 'grayscale(30%)',
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'radial-gradient(circle at 90% 20%, rgba(79, 209, 197, 0.15) 0%, transparent 50%)',
             zIndex: -1,
           },
           '@keyframes floatElements': {
@@ -387,11 +398,46 @@ const Home = () => {
           '@keyframes shine': {
             '0%': { backgroundPosition: '-100% 0' },
             '100%': { backgroundPosition: '200% 0' }
+          },
+          '@keyframes floatingDots': {
+            '0%': { opacity: 0.2 },
+            '50%': { opacity: 0.8 },
+            '100%': { opacity: 0.2 }
           }
         }}
       >
-        <Container maxWidth="lg">
+        {/* Floating particles */}
+        <Box sx={{
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+          top: 0,
+          left: 0,
+          overflow: 'hidden',
+          zIndex: 0,
+        }}>
+          {[...Array(20)].map((_, i) => (
+            <Box
+              key={i}
+              sx={{
+                position: 'absolute',
+                width: '4px',
+                height: '4px',
+                borderRadius: '50%',
+                backgroundColor: '#4FD1C5',
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                animation: `floatingDots ${Math.random() * 3 + 2}s infinite`,
+                opacity: Math.random() * 0.5 + 0.2,
+                boxShadow: '0 0 6px #4FD1C5',
+              }}
+            />
+          ))}
+        </Box>
+
+        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
           <Grid container spacing={6} alignItems="center">
+            {/* Left side - Text content */}
             <Grid item xs={12} md={6}>
               <Box sx={{
                 animation: isTripBotVisible 
@@ -402,10 +448,10 @@ const Home = () => {
                 <Typography 
                   variant="h2" 
                   sx={{
-                    color: 'white',
+                    color: '#fff',
                     fontWeight: 700,
                     mb: 3,
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                    textShadow: '0 2px 10px rgba(0,0,0,0.5)',
                     fontFamily: "'Poppins', sans-serif",
                     position: 'relative',
                     display: 'inline-block',
@@ -416,9 +462,10 @@ const Home = () => {
                       left: 0,
                       width: '80px',
                       height: '4px',
-                      background: 'linear-gradient(90deg, #fff, #4FD1C5, #fff)',
+                      background: 'linear-gradient(90deg, #4FD1C5, #63B3ED, #4FD1C5)',
                       backgroundSize: '200% 100%',
                       animation: 'waveAnimation 2s infinite',
+                      borderRadius: '2px',
                     }
                   }}
                 >
@@ -427,7 +474,7 @@ const Home = () => {
                 <Typography 
                   variant="h5" 
                   sx={{
-                    color: 'white',
+                    color: '#B2F5EA',
                     mb: 3,
                     fontFamily: "'Poppins', sans-serif",
                     animation: isTripBotVisible 
@@ -447,7 +494,7 @@ const Home = () => {
                   <Typography 
                     variant="body1" 
                     sx={{
-                      color: 'white',
+                      color: '#E2E8F0',
                       mb: 4,
                       fontSize: '1.1rem',
                       lineHeight: 1.6,
@@ -456,27 +503,63 @@ const Home = () => {
                   >
                     Our TripBot combines cutting-edge AI with local expertise to create the perfect Sri Lankan adventure for you. Whether you're interested in ancient temples, pristine beaches, lush tea plantations, or wildlife safaris, our TripBot will craft a personalized itinerary that matches your interests, budget, and travel style.
                   </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
+                    {[
+                      { icon: '🏛️', label: 'Cultural Sites' },
+                      { icon: '🏖️', label: 'Beaches' },
+                      { icon: '🌿', label: 'Tea Plantations' },
+                      { icon: '🐘', label: 'Wildlife' },
+                      { icon: '🍛', label: 'Cuisine' },
+                      { icon: '🧘', label: 'Wellness' }
+                    ].map((item) => (
+                      <Box key={item.label} sx={{
+                        backgroundColor: 'rgba(79, 209, 197, 0.1)',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        backdropFilter: 'blur(4px)',
+                        border: '1px solid rgba(79, 209, 197, 0.2)',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          backgroundColor: 'rgba(79, 209, 197, 0.2)',
+                          transform: 'translateY(-2px)',
+                        }
+                      }}>
+                        <Typography sx={{ fontSize: '16px' }}>{item.icon}</Typography>
+                        <Typography sx={{ 
+                          color: '#E2E8F0',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontSize: '0.9rem',
+                          fontWeight: 500,
+                        }}>
+                          {item.label}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
                   <Button
                     variant="contained"
                     size="large"
                     startIcon={<ChatIcon />}
                     onClick={() => navigate('/tripbot')}
                     sx={{
-                      backgroundColor: 'white',
+                      backgroundImage: 'linear-gradient(90deg, #4FD1C5, #63B3ED)',
                       color: '#0E374E',
+                      fontWeight: 600,
                       '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        backgroundImage: 'linear-gradient(90deg, #38A89D, #4299E1)',
                         transform: 'translateY(-3px)',
-                        boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)',
+                        boxShadow: '0 8px 20px rgba(79, 209, 197, 0.3)',
                       },
                       px: 4,
                       py: 1.5,
                       fontFamily: "'Poppins', sans-serif",
                       textTransform: 'none',
                       fontSize: '1.1rem',
-                      fontWeight: 500,
                       borderRadius: '8px',
-                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.2)',
+                      boxShadow: '0 4px 14px rgba(79, 209, 197, 0.3)',
                       transition: 'all 0.3s ease',
                     }}
                   >
@@ -486,10 +569,11 @@ const Home = () => {
               </Box>
             </Grid>
 
+            {/* Right side - Animated TripBot visual */}
             <Grid item xs={12} md={6}>
               <Box sx={{
                 position: 'relative',
-                height: 400,
+                height: 450,
                 width: '100%',
                 display: 'flex',
                 justifyContent: 'center',
@@ -502,104 +586,326 @@ const Home = () => {
                 <Box
                   sx={{
                     position: 'relative',
-                    width: '80%',
-                    height: '80%',
-                    borderRadius: '20px',
+                    width: '90%',
+                    height: '85%',
+                    borderRadius: '16px',
                     overflow: 'hidden',
-                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: 'rgba(14, 55, 78, 0.7)',
-                      backdropFilter: 'blur(4px)',
-                      zIndex: 1,
-                    },
+                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(79, 209, 197, 0.2)',
+                    background: 'rgba(17, 25, 40, 0.8)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(79, 209, 197, 0.2)',
                     '@keyframes pulse': {
                       '0%': { transform: 'scale(1)' },
-                      '50%': { transform: 'scale(1.05)' },
+                      '50%': { transform: 'scale(1.02)' },
                       '100%': { transform: 'scale(1)' }
                     },
                     animation: isTripBotVisible ? 'pulse 4s infinite ease-in-out' : 'none'
                   }}
                 >
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundImage: 'url("https://images.unsplash.com/photo-1546975490-e8b92a360b24?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80")',
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      zIndex: 0,
-                    }}
-                  />
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      zIndex: 2,
-                      textAlign: 'center',
-                      width: '100%',
-                      px: 4,
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        mb: 2,
-                        '@keyframes robotFloat': {
-                          '0%': { transform: 'translateY(0)' },
-                          '50%': { transform: 'translateY(-10px)' },
-                          '100%': { transform: 'translateY(0)' }
-                        },
-                        animation: isTripBotVisible ? 'robotFloat 3s infinite ease-in-out' : 'none'
-                      }}
-                    >
-                      <SmartToyIcon
-                        sx={{
-                          fontSize: 80,
-                          color: '#4FD1C5',
-                          filter: 'drop-shadow(0 0 10px rgba(79, 209, 197, 0.7))',
-                        }}
-                      />
+                  {/* ChatBot UI Window */}
+                  <Box sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '40px',
+                    background: 'rgba(17, 25, 40, 0.9)',
+                    borderBottom: '1px solid rgba(79, 209, 197, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    px: 2
+                  }}>
+                    <Box sx={{ display: 'flex', gap: 1, mr: 2 }}>
+                      {[
+                        { color: '#FF5F57' },
+                        { color: '#FFBD2E' },
+                        { color: '#28CA41' }
+                      ].map((dot, i) => (
+                        <Box 
+                          key={i}
+                          sx={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            backgroundColor: dot.color
+                          }}
+                        />
+                      ))}
                     </Box>
                     <Typography
-                      variant="h4"
                       sx={{
-                        color: 'white',
-                        fontWeight: 600,
-                        mb: 2,
-                        textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+                        color: '#fff',
+                        fontSize: '0.8rem',
                         fontFamily: "'Poppins', sans-serif",
-                        background: 'linear-gradient(90deg, #4FD1C5, #fff, #4FD1C5)',
-                        backgroundSize: '200% 100%',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        animation: 'shine 3s infinite linear',
+                        fontWeight: 500,
+                        opacity: 0.8
                       }}
                     >
-                      Ceylon TripBot
+                      Ceylon TripBot — AI Travel Companion
                     </Typography>
-                    <Typography
-                      variant="body1"
+                  </Box>
+                  
+                  {/* Bot messages area */}
+                  <Box sx={{
+                    position: 'absolute',
+                    top: '40px',
+                    left: 0,
+                    right: 0,
+                    bottom: '60px',
+                    p: 2,
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2
+                  }}>
+                    {/* Bot intro message */}
+                    <Box sx={{ display: 'flex', gap: 1.5, maxWidth: '80%' }}>
+                      <Box sx={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #4FD1C5, #63B3ED)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        boxShadow: '0 4px 8px rgba(79, 209, 197, 0.3)'
+                      }}>
+                        <SmartToyIcon sx={{ fontSize: 20, color: '#fff' }} />
+                      </Box>
+                      <Box sx={{
+                        background: 'rgba(79, 209, 197, 0.1)',
+                        p: 2,
+                        borderRadius: '2px 16px 16px 16px',
+                        border: '1px solid rgba(79, 209, 197, 0.2)'
+                      }}>
+                        <Typography
+                          sx={{
+                            color: '#fff',
+                            fontSize: '0.9rem',
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 500,
+                            mb: 1
+                          }}
+                        >
+                          Ayubowan! I'm Ceylon TripBot 🇱🇰
+                        </Typography>
+                        <Typography
+                          sx={{
+                            color: '#E2E8F0',
+                            fontSize: '0.85rem',
+                            fontFamily: "'Poppins', sans-serif",
+                            lineHeight: 1.5
+                          }}
+                        >
+                          I can help you plan your perfect Sri Lanka trip. What places would you like to visit?
+                        </Typography>
+                      </Box>
+                    </Box>
+                    
+                    {/* Quick reply buttons */}
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, ml: 7 }}>
+                      {[
+                        "I need help planning my itinerary",
+                        "Recommend best beaches",
+                        "Cultural experiences",
+                        "Best time to visit"
+                      ].map((text, i) => (
+                        <Box
+                          key={i}
+                          sx={{
+                            background: 'rgba(255, 255, 255, 0.07)',
+                            borderRadius: '16px',
+                            px: 2,
+                            py: 0.8,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            '&:hover': {
+                              background: 'rgba(79, 209, 197, 0.15)',
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              color: '#E2E8F0',
+                              fontSize: '0.8rem',
+                              fontFamily: "'Poppins', sans-serif",
+                            }}
+                          >
+                            {text}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                    
+                    {/* User message */}
+                    <Box sx={{ display: 'flex', gap: 1.5, alignSelf: 'flex-end', maxWidth: '80%' }}>
+                      <Box sx={{
+                        background: 'rgba(99, 179, 237, 0.2)',
+                        p: 2,
+                        borderRadius: '16px 2px 16px 16px',
+                        border: '1px solid rgba(99, 179, 237, 0.2)'
+                      }}>
+                        <Typography
+                          sx={{
+                            color: '#E2E8F0',
+                            fontSize: '0.85rem',
+                            fontFamily: "'Poppins', sans-serif",
+                            lineHeight: 1.5
+                          }}
+                        >
+                          I'd like to visit the beaches and ancient temples in Sri Lanka.
+                        </Typography>
+                      </Box>
+                      <Avatar
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          bgcolor: '#63B3ED',
+                          fontSize: '0.9rem',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 500,
+                          flexShrink: 0
+                        }}
+                      >
+                        U
+                      </Avatar>
+                    </Box>
+                    
+                    {/* Bot response with recommendation */}
+                    <Box sx={{ display: 'flex', gap: 1.5, maxWidth: '80%' }}>
+                      <Box sx={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #4FD1C5, #63B3ED)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        boxShadow: '0 4px 8px rgba(79, 209, 197, 0.3)'
+                      }}>
+                        <SmartToyIcon sx={{ fontSize: 20, color: '#fff' }} />
+                      </Box>
+                      <Box sx={{
+                        background: 'rgba(79, 209, 197, 0.1)',
+                        p: 2,
+                        borderRadius: '2px 16px 16px 16px',
+                        border: '1px solid rgba(79, 209, 197, 0.2)'
+                      }}>
+                        <Typography
+                          sx={{
+                            color: '#E2E8F0',
+                            fontSize: '0.85rem',
+                            fontFamily: "'Poppins', sans-serif",
+                            lineHeight: 1.5,
+                            mb: 2
+                          }}
+                        >
+                          Great choice! I recommend starting with Unawatuna Beach, then visiting the Galle Fort (UNESCO site), followed by the ancient city of Polonnaruwa and the Temple of the Sacred Tooth Relic in Kandy.
+                        </Typography>
+                        <Box 
+                          sx={{
+                            background: 'rgba(17, 25, 40, 0.6)',
+                            borderRadius: '8px',
+                            p: 1.5,
+                            border: '1px solid rgba(99, 179, 237, 0.2)',
+                            mb: 1.5
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              color: '#63B3ED',
+                              fontSize: '0.8rem',
+                              fontFamily: "'Poppins', sans-serif",
+                              fontWeight: 600,
+                              mb: 1
+                            }}
+                          >
+                            ✨ Suggested 7-Day Itinerary
+                          </Typography>
+                          <Typography
+                            sx={{
+                              color: '#E2E8F0',
+                              fontSize: '0.8rem',
+                              fontFamily: "'Poppins', sans-serif",
+                              lineHeight: 1.5
+                            }}
+                          >
+                            Day 1-2: Colombo & Negombo Beach<br/>
+                            Day 3-4: Galle Fort & Unawatuna Beach<br/>
+                            Day 5-6: Kandy & Temple of the Tooth<br/>
+                            Day 7: Polonnaruwa Ancient City
+                          </Typography>
+                        </Box>
+                        <Typography
+                          sx={{
+                            color: '#B2F5EA',
+                            fontSize: '0.85rem',
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 500
+                          }}
+                        >
+                          Would you like to customize this itinerary?
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                  
+                  {/* Input area */}
+                  <Box sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: '60px',
+                    background: 'rgba(17, 25, 40, 0.9)',
+                    borderTop: '1px solid rgba(79, 209, 197, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    px: 2,
+                    gap: 1
+                  }}>
+                    <Box sx={{
+                      flex: 1,
+                      height: '36px',
+                      background: 'rgba(255, 255, 255, 0.07)',
+                      borderRadius: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      px: 2,
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                    }}>
+                      <Typography
+                        sx={{
+                          color: 'rgba(255, 255, 255, 0.5)',
+                          fontSize: '0.85rem',
+                          fontFamily: "'Poppins', sans-serif",
+                        }}
+                      >
+                        Type your message...
+                      </Typography>
+                    </Box>
+                    <Box
                       sx={{
-                        color: 'white',
-                        mb: 3,
-                        opacity: 0.9,
-                        fontFamily: "'Poppins', sans-serif",
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #4FD1C5, #63B3ED)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.1)'
+                        }
                       }}
                     >
-                      "Ayubowan! I'm here to help you discover the wonders of Sri Lanka."
-                    </Typography>
+                      <ChatIcon sx={{ fontSize: 20, color: '#fff' }} />
+                    </Box>
                   </Box>
                 </Box>
               </Box>
