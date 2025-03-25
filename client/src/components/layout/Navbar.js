@@ -92,12 +92,12 @@ const Navbar = () => {
         sx={{
           background: isScrolled 
             ? 'rgba(14, 55, 78, 0.95)'
-            : 'rgba(14, 55, 78, 0.8)',
+            : 'rgba(14, 55, 78, 0)',
           boxShadow: isScrolled 
             ? '0 4px 20px rgba(14, 55, 78, 0.2)'
-            : '0 2px 10px rgba(14, 55, 78, 0.1)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
+            : 'none',
+          backdropFilter: isScrolled ? 'blur(8px)' : 'none',
+          WebkitBackdropFilter: isScrolled ? 'blur(8px)' : 'none',
           borderRadius: '12px',
           transition: 'all 0.3s ease-in-out',
           maxWidth: '1400px',
