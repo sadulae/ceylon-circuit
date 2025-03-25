@@ -14,11 +14,11 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { login, clearError, selectAuthError, selectAuthLoading } from '../../redux/slices/authSlice';
-import EmailIcon from '@mui/icons-material/Email';
 import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 const Login = () => {
   const [formData, setFormData] = useState({

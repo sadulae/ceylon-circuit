@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppBar, Box, Toolbar, Typography, Button, Container, useScrollTrigger, Avatar } from '@mui/material';
+import { AppBar, Box, Toolbar, Typography, Button, Avatar } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../redux/slices/authSlice';

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { Box, Container, CssBaseline, Typography } from '@mui/material';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Box, CssBaseline, Typography } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { verifyAuth } from './redux/slices/authSlice';
 
@@ -53,6 +53,7 @@ const TourManagement = () => (
 
 function App() {
   const dispatch = useDispatch();
+  const location = useLocation();
 
   useEffect(() => {
     // Verify authentication when app loads
@@ -61,11 +62,28 @@ function App() {
     }
   }, [dispatch]);
 
+  // Hide footer on TripBot page
+  const shouldShowFooter = location.pathname !== '/tripbot';
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box 
+      sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        minHeight: '100vh',
+        bgcolor: location.pathname === '/tripbot' ? '#f5f5f5' : 'background.default'
+      }}
+    >
       <CssBaseline />
       <Navbar />
-      <Box component="main" sx={{ flexGrow: 1 }}>
+      <Box 
+        component="main" 
+        sx={{ 
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -124,7 +142,7 @@ function App() {
           />
         </Routes>
       </Box>
-      <Footer />
+      {shouldShowFooter && <Footer />}
     </Box>
   );
 }
