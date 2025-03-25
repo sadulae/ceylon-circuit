@@ -20,6 +20,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/tripbot', require('./routes/tripbot'));
+app.use('/api/destinations', require('./routes/destinations'));
 
 // Basic route for testing
 app.get('/', (req, res) => {
