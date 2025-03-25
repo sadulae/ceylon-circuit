@@ -43,8 +43,8 @@ const heroImages = [
 
 const Home = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const theme = useTheme();
   const navigate = useNavigate();
+  const [activeStep, setActiveStep] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {

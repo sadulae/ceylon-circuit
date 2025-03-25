@@ -8,7 +8,6 @@ import {
   Button,
   TextField,
   Grid,
-  Divider,
   CircularProgress,
   Alert,
   InputAdornment,
@@ -24,7 +23,6 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 const Profile = () => {
   const { user, loading } = useSelector((state) => state.auth);
