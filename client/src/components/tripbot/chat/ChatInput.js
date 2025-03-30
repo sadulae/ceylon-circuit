@@ -34,7 +34,7 @@ const StyledTextField = styled(TextField)(({ theme, isDarkMode }) => ({
     padding: theme.spacing(1, 2),
     borderRadius: '2rem',
     backgroundColor: 'transparent',
-    color: isDarkMode ? theme.palette.common.white : theme.palette.text.primary,
+    color: isDarkMode ? '#E2E8F0' : theme.palette.text.primary,
     '&.Mui-focused': {
       backgroundColor: isDarkMode
         ? 'rgba(255, 255, 255, 0.05)'
@@ -55,7 +55,7 @@ const StyledTextField = styled(TextField)(({ theme, isDarkMode }) => ({
     lineHeight: 1.5,
     '&::placeholder': {
       color: isDarkMode 
-        ? 'rgba(255, 255, 255, 0.5)'
+        ? 'rgba(226, 232, 240, 0.5)'
         : theme.palette.text.secondary,
       opacity: 0.8,
     },
@@ -63,13 +63,13 @@ const StyledTextField = styled(TextField)(({ theme, isDarkMode }) => ({
 }));
 
 const SendButton = styled(IconButton)(({ theme, isDarkMode }) => ({
-  backgroundColor: theme.palette.primary.main,
-  color: theme.palette.common.white,
+  backgroundColor: isDarkMode ? '#B2F5EA' : theme.palette.primary.main,
+  color: isDarkMode ? '#1E2937' : theme.palette.common.white,
   width: 40,
   height: 40,
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   '&:hover': {
-    backgroundColor: theme.palette.primary.dark,
+    backgroundColor: isDarkMode ? '#A5F3E0' : theme.palette.primary.dark,
     transform: 'scale(1.05) rotate(10deg)',
   },
   '&.Mui-disabled': {

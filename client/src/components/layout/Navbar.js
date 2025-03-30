@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppBar, Box, Toolbar, Typography, Button, Avatar } from '@mui/material';
+import { AppBar, Box, Toolbar, Typography, Button, Avatar, Container, useScrollTrigger } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../redux/slices/authSlice';
@@ -24,42 +24,27 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    // Wait for page load
-    window.addEventListener('load', () => {
-      setIsPageLoaded(true);
-    });
-
-    // Fallback if page is already loaded
-    if (document.readyState === 'complete') {
-      setIsPageLoaded(true);
-    }
-
+    // Set page as loaded immediately
+    setIsPageLoaded(true);
+    
+    // Initial animation after a short delay
+    const initialTimer = setTimeout(() => {
+      setIsLogoAnimated(true);
+      
+      // Logo animation cycle
+      const animationInterval = setInterval(() => {
+        setIsLogoAnimated(prev => !prev);
+      }, 8000); // Toggle every 8 seconds
+      
+      return () => {
+        clearInterval(animationInterval);
+      };
+    }, 1000);
+    
     return () => {
-      window.removeEventListener('load', () => setIsPageLoaded(true));
+      clearTimeout(initialTimer);
     };
   }, []);
-
-  useEffect(() => {
-    let startTimer;
-    let endTimer;
-
-    if (isPageLoaded) {
-      // Start animation after 500ms of page load
-      startTimer = setTimeout(() => {
-        setIsLogoAnimated(true);
-      }, 500);
-
-      // End animation after 4 seconds
-      endTimer = setTimeout(() => {
-        setIsLogoAnimated(false);
-      }, 4000);
-    }
-
-    return () => {
-      clearTimeout(startTimer);
-      clearTimeout(endTimer);
-    };
-  }, [isPageLoaded]);
 
   const handleLogin = () => {
     // Store the current path in localStorage before navigating to login
@@ -108,21 +93,11 @@ const Navbar = () => {
           '@keyframes gradientText': {
             '0%': {
               backgroundPosition: '0% 50%',
-              opacity: 0
-            },
-            '10%': {
-              opacity: 1
-            },
-            '50%': {
-              backgroundPosition: '100% 50%',
-              opacity: 1
-            },
-            '90%': {
-              opacity: 1
+              backgroundSize: '200% auto',
             },
             '100%': {
-              backgroundPosition: '0% 50%',
-              opacity: 0
+              backgroundPosition: '100% 50%',
+              backgroundSize: '200% auto',
             }
           },
           '@keyframes fadeInLogo': {
@@ -145,7 +120,7 @@ const Navbar = () => {
         >
           <Typography 
             variant="h6" 
-            component="div"
+            component="div" 
             onClick={() => navigate('/')}
             sx={{ 
               cursor: 'pointer',
@@ -157,11 +132,15 @@ const Navbar = () => {
               transform: isPageLoaded ? 'translateY(0)' : 'translateY(-20px)',
               animation: isPageLoaded ? 'fadeInLogo 0.5s ease-out' : 'none',
               background: isLogoAnimated
-                ? 'linear-gradient(45deg, #4FD1C5 30%, #0E374E 90%)'
+                ? 'linear-gradient(90deg, #4FD1C5 0%, #38B2AC 25%, #0E374E 50%, #38B2AC 75%, #4FD1C5 100%)'
                 : '#fff',
+              backgroundSize: '200% auto',
+              animation: isLogoAnimated 
+                ? 'gradientText 3s linear infinite' 
+                : 'none',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: isLogoAnimated ? 'transparent' : '#fff',
-              transition: 'all 0.6s ease-in-out',
+              transition: 'color 0.3s ease-in-out, background 0.3s ease-in-out',
               textShadow: isScrolled || isLogoAnimated ? 'none' : '2px 2px 4px rgba(0,0,0,0.3)',
               position: 'relative',
               '&::after': {
@@ -171,7 +150,7 @@ const Navbar = () => {
                 top: 0,
                 color: '#fff',
                 opacity: isLogoAnimated ? 0 : 1,
-                transition: 'opacity 0.6s ease-in-out',
+                transition: 'opacity 0.3s ease-in-out',
                 textShadow: isScrolled ? 'none' : '2px 2px 4px rgba(0,0,0,0.3)',
               },
               '&:hover': {
@@ -181,10 +160,10 @@ const Navbar = () => {
           >
             Ceylon Circuit
           </Typography>
-          
+
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mr: 2 }}>
             <Button 
-              color="inherit"
+              color="inherit" 
               onClick={() => navigate('/')}
               sx={{ 
                 color: '#fff',
@@ -198,11 +177,11 @@ const Navbar = () => {
             >
               Home
             </Button>
-            
+
             {isAuthenticated ? (
               <>
                 <Button 
-                  color="inherit"
+                  color="inherit" 
                   onClick={() => navigate('/tripbot')}
                   sx={{ 
                     color: '#fff',
@@ -217,7 +196,7 @@ const Navbar = () => {
                   TripBot
                 </Button>
                 <Button 
-                  color="inherit"
+                  color="inherit" 
                   onClick={() => navigate('/profile')}
                   sx={{ 
                     color: '#fff',
@@ -246,7 +225,7 @@ const Navbar = () => {
                   Profile
                 </Button>
                 <Button 
-                  color="inherit"
+                  color="inherit" 
                   onClick={handleLogout}
                   sx={{ 
                     color: '#fff',
