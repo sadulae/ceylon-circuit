@@ -26,13 +26,14 @@ const ChatContainer = styled(Paper)(({ theme, isDarkMode }) => ({
   flexDirection: 'column',
   height: '100%',
   backgroundColor: isDarkMode 
-    ? 'rgba(18, 18, 18, 0.8)' 
+    ? 'rgba(30, 41, 55, 0.8)' 
     : theme.palette.background.default,
   borderRadius: theme.shape.borderRadius * 2,
   overflow: 'hidden',
   position: 'relative',
   transition: 'all 0.3s ease',
   backdropFilter: 'blur(10px)',
+  border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : 'none',
 }));
 
 const MessagesContainer = styled(Box)(({ theme, isDarkMode }) => ({
@@ -44,7 +45,7 @@ const MessagesContainer = styled(Box)(({ theme, isDarkMode }) => ({
   gap: theme.spacing(2),
   scrollBehavior: 'smooth',
   backgroundColor: isDarkMode 
-    ? 'rgba(18, 18, 18, 0.6)' 
+    ? 'rgba(18, 18, 18, 0.4)' 
     : 'rgba(255, 255, 255, 0.8)',
   '&::-webkit-scrollbar': {
     width: '8px',
@@ -87,13 +88,14 @@ const TypingIndicator = styled(Box)(({ theme, isDarkMode }) => ({
     : '0 2px 12px rgba(0,0,0,0.1)',
   animation: `${pulseAnimation} 2s ease-in-out infinite`,
   backdropFilter: 'blur(8px)',
+  border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : 'none',
 }));
 
 const InputWrapper = styled(Box)(({ theme, isDarkMode }) => ({
   padding: theme.spacing(2, 3),
   borderTop: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : theme.palette.divider}`,
   backgroundColor: isDarkMode
-    ? 'rgba(18, 18, 18, 0.8)'
+    ? 'rgba(30, 41, 55, 0.8)'
     : theme.palette.background.paper,
   backdropFilter: 'blur(10px)',
   [theme.breakpoints.down('sm')]: {
