@@ -10,8 +10,11 @@ import {
   Close as CloseIcon,
   Add as AddIcon,
   DarkMode as DarkModeIcon,
-  LightMode as LightModeIcon
+  LightMode as LightModeIcon,
+  SmartToy as SmartToyIcon
 } from '@mui/icons-material';
+import { generateAIResponse } from '../../services/aiService';
+import { testHuggingFaceAPI } from '../../services/testApi';
 
 const StyledContainer = styled(Container)(({ theme }) => ({
   position: 'fixed',
@@ -22,9 +25,21 @@ const StyledContainer = styled(Container)(({ theme }) => ({
   padding: theme.spacing(3),
   display: 'flex',
   flexDirection: 'column',
-  background: theme.palette.mode === 'dark' 
-    ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)' 
-    : 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+  background: 'linear-gradient(135deg, #0F172A 0%, #1E2937 100%)',
+  position: 'relative',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'url("https://images.unsplash.com/photo-1528181304800-259b08848526?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80")',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    opacity: 0.1,
+    zIndex: 0,
+  },
   [theme.breakpoints.up('md')]: {
     padding: theme.spacing(4),
   },
@@ -34,28 +49,65 @@ const StyledContainer = styled(Container)(({ theme }) => ({
   },
 }));
 
+const FloatingRobot = styled(Box)(({ theme }) => ({
+  position: 'fixed',
+  top: '50%',
+  right: theme.spacing(4),
+  transform: 'translateY(-50%)',
+  zIndex: 1000,
+  animation: 'float 6s ease-in-out infinite',
+  '@keyframes float': {
+    '0%, 100%': {
+      transform: 'translateY(-50%) translateX(0)',
+    },
+    '50%': {
+      transform: 'translateY(-50%) translateX(20px)',
+    },
+  },
+  [theme.breakpoints.down('md')]: {
+    display: 'none',
+  },
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '200px',
+    height: '200px',
+    background: 'radial-gradient(circle, rgba(178,245,234,0.2) 0%, rgba(178,245,234,0) 70%)',
+    borderRadius: '50%',
+    animation: 'pulse 4s ease-in-out infinite',
+    zIndex: -1,
+  },
+  '@keyframes pulse': {
+    '0%, 100%': {
+      transform: 'translate(-50%, -50%) scale(1)',
+      opacity: 0.5,
+    },
+    '50%': {
+      transform: 'translate(-50%, -50%) scale(1.2)',
+      opacity: 0.2,
+    },
+  },
+}));
+
 const FloatingActionButton = styled(Button)(({ theme }) => ({
   borderRadius: '28px',
   padding: theme.spacing(1.5, 3),
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 8px 16px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)'
-    : '0 8px 16px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05)',
+  boxShadow: '0 8px 16px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
   textTransform: 'none',
   fontWeight: 500,
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  backgroundColor: theme.palette.mode === 'dark' 
-    ? 'rgba(255,255,255,0.05)'
-    : theme.palette.background.paper,
-  color: theme.palette.primary.main,
-  border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : theme.palette.primary.main}`,
+  backgroundColor: 'rgba(178,245,234,0.1)',
+  color: '#B2F5EA',
+  border: '1px solid rgba(178,245,234,0.2)',
   backdropFilter: 'blur(8px)',
   '&:hover': {
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.common.white,
+    backgroundColor: 'rgba(178,245,234,0.2)',
+    color: '#B2F5EA',
     transform: 'translateY(-2px) scale(1.02)',
-    boxShadow: theme.palette.mode === 'dark'
-      ? '0 12px 24px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)'
-      : '0 12px 20px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.1)',
+    boxShadow: '0 12px 24px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)',
   },
 }));
 
@@ -71,45 +123,17 @@ const FloatingButtonContainer = styled(Box)(({ theme }) => ({
 }));
 
 const SpeedDialButton = styled(IconButton)(({ theme }) => ({
-  backgroundColor: theme.palette.mode === 'dark' 
-    ? 'rgba(255,255,255,0.05)'
-    : theme.palette.primary.main,
-  color: theme.palette.mode === 'dark'
-    ? theme.palette.primary.main
-    : theme.palette.common.white,
+  backgroundColor: 'rgba(178,245,234,0.1)',
+  color: '#B2F5EA',
   width: 56,
   height: 56,
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  border: '1px solid rgba(178,245,234,0.2)',
   '&:hover': {
-    backgroundColor: theme.palette.mode === 'dark'
-      ? 'rgba(255,255,255,0.1)'
-      : theme.palette.primary.dark,
+    backgroundColor: 'rgba(178,245,234,0.2)',
     transform: 'scale(1.1) rotate(90deg)',
   },
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 8px 16px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)'
-    : '0 8px 16px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05)',
-}));
-
-const ThemeModeButton = styled(IconButton)(({ theme }) => ({
-  position: 'fixed',
-  top: theme.spacing(3),
-  right: theme.spacing(3),
-  backgroundColor: theme.palette.mode === 'dark'
-    ? 'rgba(255,255,255,0.05)'
-    : 'rgba(0,0,0,0.05)',
-  color: theme.palette.mode === 'dark'
-    ? theme.palette.common.white
-    : theme.palette.grey[900],
-  backdropFilter: 'blur(8px)',
-  border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-  '&:hover': {
-    backgroundColor: theme.palette.mode === 'dark'
-      ? 'rgba(255,255,255,0.1)'
-      : 'rgba(0,0,0,0.1)',
-    transform: 'scale(1.1)',
-  },
-  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  boxShadow: '0 8px 16px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
 }));
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -118,9 +142,42 @@ const TripBot = () => {
   const [messages, setMessages] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [showActions, setShowActions] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [context, setContext] = useState({});
+  const [apiStatus, setApiStatus] = useState('checking'); // 'checking', 'connected', 'error'
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // Test API connection on component mount
+  useEffect(() => {
+    const checkApiConnection = async () => {
+      try {
+        await testHuggingFaceAPI();
+        setApiStatus('connected');
+        console.log('API connection successful');
+      } catch (error) {
+        console.error('API connection failed:', error);
+        setApiStatus('error');
+        // Add error message to chat
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          type: 'bot',
+          content: (
+            <Box>
+              <Typography variant="body1" color="error" gutterBottom>
+                I'm having trouble connecting to my AI service.
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                I'll still help you with basic travel information while we resolve this issue.
+              </Typography>
+            </Box>
+          ),
+          timestamp: new Date()
+        }]);
+      }
+    };
+
+    checkApiConnection();
+  }, []);
 
   const handleSuggestionClick = useCallback((suggestion) => {
     handleSendMessage(suggestion);
@@ -132,80 +189,15 @@ const TripBot = () => {
       type: 'bot',
       content: (
         <Box>
-          <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
-            👋 Welcome to Ceylon Circuit!
-          </Typography>
-          <Typography variant="body1" gutterBottom sx={{ color: 'text.secondary', mb: 3 }}>
-            I'm your personal travel assistant for planning the perfect Sri Lankan adventure. How can I help you today?
-          </Typography>
-        </Box>
-      ),
-      timestamp: new Date()
-    };
-    setMessages([welcomeMessage]);
-  }, []);
-
-  const handleSendMessage = (message) => {
-    const userMessage = {
-      id: generateId(),
-      type: 'user',
-      content: message,
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, userMessage]);
-    setIsTyping(true);
-    setShowActions(false);
-
-    setTimeout(() => {
-      const botMessage = {
-        id: generateId(),
-        type: 'bot',
-        content: generateBotResponse(message),
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, botMessage]);
-      setIsTyping(false);
-    }, 1000);
-  };
-
-  const generateBotResponse = (message) => {
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('plan') && lowerMessage.includes('trip')) {
-      return (
-        <Box>
-          <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', fontWeight: 600 }}>
-            Excellent choice! Let's create your perfect Sri Lankan itinerary 🌴
-          </Typography>
-          <Typography variant="body1" gutterBottom sx={{ color: 'text.secondary', mb: 2 }}>
-            To personalize your experience, I'll need a few details:
-          </Typography>
-          <Box sx={{ 
-            bgcolor: 'background.paper', 
-            p: 2, 
-            borderRadius: 2,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-            mb: 2
+          <Typography variant="h5" gutterBottom sx={{ 
+            fontWeight: 600, 
+            color: '#B2F5EA',
+            textShadow: '0 0 10px rgba(178,245,234,0.3)',
           }}>
-            <Box component="ul" sx={{ pl: 2, mb: 0, '& li': { mb: 1 } }}>
-              <li>📅 When would you like to travel?</li>
-              <li>⏱️ How long do you plan to stay?</li>
-              <li>💰 What's your budget range?</li>
-              <li>🎯 What interests you most?</li>
-            </Box>
-          </Box>
-          <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500 }}>
-            Let's start with your travel dates - when are you thinking of visiting Sri Lanka?
+            Ayubowan! 👋
           </Typography>
-        </Box>
-      );
-    }
-    
-    if (lowerMessage.includes('popular destinations')) {
-      return (
-        <Box>
-          <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', fontWeight: 600 }}>
-            Discover Sri Lanka's Most Beautiful Places 🌟
+          <Typography variant="body1" gutterBottom sx={{ color: '#E2E8F0', mb: 3 }}>
+            I'm your personal travel assistant for planning the perfect Sri Lankan adventure. How can I help you today?
           </Typography>
           <Box sx={{ 
             display: 'grid', 
@@ -217,8 +209,7 @@ const TripBot = () => {
               { name: 'Sigiriya', desc: 'Ancient rock fortress with panoramic views', icon: '🏰' },
               { name: 'Kandy', desc: 'Cultural heart with the Temple of the Tooth', icon: '🏛️' },
               { name: 'Galle', desc: 'Charming colonial fort city by the sea', icon: '🌊' },
-              { name: 'Yala National Park', desc: 'Wildlife paradise with leopards', icon: '🐆' },
-              { name: 'Mirissa', desc: 'Stunning beaches and whale watching', icon: '🐋' }
+              { name: 'Yala National Park', desc: 'Wildlife paradise with leopards', icon: '🐆' }
             ].map((place) => (
               <Paper
                 key={place.name}
@@ -226,251 +217,318 @@ const TripBot = () => {
                 sx={{
                   p: 2,
                   borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  bgcolor: 'rgba(255,255,255,0.05)',
                   transition: 'transform 0.2s ease',
                   '&:hover': {
                     transform: 'translateY(-2px)',
+                    bgcolor: 'rgba(255,255,255,0.08)',
                   }
                 }}
               >
                 <Typography variant="h3" sx={{ mb: 1, fontSize: '2rem' }}>{place.icon}</Typography>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>{place.name}</Typography>
-                <Typography variant="body2" color="text.secondary">{place.desc}</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, color: '#B2F5EA' }}>{place.name}</Typography>
+                <Typography variant="body2" sx={{ color: '#E2E8F0' }}>{place.desc}</Typography>
               </Paper>
             ))}
           </Box>
-          <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-            Would you like to learn more about any of these places or start planning a visit?
-          </Typography>
         </Box>
-      );
-    }
+      ),
+      timestamp: new Date()
+    };
+    setMessages([welcomeMessage]);
+  }, []);
 
-    if (lowerMessage.includes('best time')) {
-      return (
-        <Box>
-          <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', fontWeight: 600 }}>
-            Best Times to Visit Sri Lanka 🗓️
-          </Typography>
-          <Box sx={{ 
-            bgcolor: 'background.paper',
-            borderRadius: 2,
-            overflow: 'hidden',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-            mb: 2
-          }}>
-            {[
-              { season: 'December to March', desc: 'Perfect for the west and south coasts', icon: '🏖️' },
-              { season: 'April to September', desc: 'Ideal for the east coast', icon: '🌅' },
-              { season: 'January to March', desc: 'Best for wildlife watching', icon: '🦁' },
-              { season: 'Year-round', desc: 'Cultural sites and attractions', icon: '🏛️' }
-            ].map((time, index) => (
-              <Box
-                key={time.season}
-                sx={{
-                  p: 2,
-                  borderBottom: index < 3 ? '1px solid' : 'none',
-                  borderColor: 'divider',
-                  '&:hover': {
-                    bgcolor: 'action.hover'
-                  }
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {time.icon} {time.season}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">{time.desc}</Typography>
-              </Box>
-            ))}
+  const handleSendMessage = async (message) => {
+    const userMessage = {
+      id: generateId(),
+      type: 'user',
+      content: message,
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, userMessage]);
+    setIsTyping(true);
+    setShowActions(false);
+
+    try {
+      const response = await generateAIResponse(message, context);
+      
+      // Update context based on the response
+      if (response.type === 'accommodation' && Array.isArray(response.content)) {
+        setContext(prev => ({ ...prev, location: response.content[0]?.location }));
+      }
+      
+      const botMessage = {
+        id: generateId(),
+        type: 'bot',
+        content: formatBotResponse(response),
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error generating response:', error);
+      const errorMessage = {
+        id: generateId(),
+        type: 'bot',
+        content: (
+          <Box>
+            <Typography variant="body1" color="error" gutterBottom>
+              I apologize, but I encountered an error processing your request.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Please try rephrasing your question or ask about something else.
+            </Typography>
           </Box>
-          <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-            When are you planning to travel? I can help you choose the perfect destinations for that time of year!
-          </Typography>
-        </Box>
-      );
+        ),
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsTyping(false);
     }
+  };
 
-    if (lowerMessage.includes('budget')) {
-      return (
-        <Box>
-          <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', fontWeight: 600 }}>
-            Sri Lanka Travel Budget Guide 💰
-          </Typography>
-          <Box sx={{ 
-            display: 'grid',
-            gap: 2,
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
-            mb: 3
-          }}>
-            {[
-              { level: 'Budget', cost: '$30-50/day', desc: 'Basic accommodations, local food', icon: '🏨' },
-              { level: 'Mid-range', cost: '$100-200/day', desc: '3-star hotels, guided tours', icon: '⭐' },
-              { level: 'Luxury', cost: '$200+/day', desc: '5-star resorts, private tours', icon: '🌟' }
-            ].map((budget) => (
+  const formatBotResponse = (response) => {
+    switch (response.type) {
+      case 'accommodation':
+        return (
+          <Box>
+            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
+              Here are some accommodations that match your preferences:
+            </Typography>
+            <Box sx={{ 
+              display: 'grid', 
+              gap: 2,
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+              mb: 2
+            }}>
+              {response.content.map((acc) => (
+                <Paper
+                  key={acc.name}
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    transition: 'transform 0.2s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      bgcolor: 'rgba(255,255,255,0.08)',
+                    }
+                  }}
+                >
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, color: '#B2F5EA' }}>
+                    {acc.name}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#E2E8F0', mb: 1 }}>
+                    {acc.location}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#E2E8F0' }}>
+                    ${acc.price} per night
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+          </Box>
+        );
+      
+      case 'activity':
+        return (
+          <Box>
+            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
+              Here are some activities you might enjoy:
+            </Typography>
+            <Box sx={{ 
+              display: 'grid', 
+              gap: 2,
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+              mb: 2
+            }}>
+              {response.content.map((activity) => (
+                <Paper
+                  key={activity.name}
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    transition: 'transform 0.2s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      bgcolor: 'rgba(255,255,255,0.08)',
+                    }
+                  }}
+                >
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, color: '#B2F5EA' }}>
+                    {activity.name}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#E2E8F0', mb: 1 }}>
+                    {activity.location}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#E2E8F0' }}>
+                    ${activity.price} - {activity.duration}
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+          </Box>
+        );
+      
+      case 'transport':
+        return (
+          <Box>
+            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
+              Here are some transport options:
+            </Typography>
+            <Box sx={{ 
+              display: 'grid', 
+              gap: 2,
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+              mb: 2
+            }}>
+              {response.content.map((t) => (
+                <Paper
+                  key={t.name}
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    transition: 'transform 0.2s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      bgcolor: 'rgba(255,255,255,0.08)',
+                    }
+                  }}
+                >
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, color: '#B2F5EA' }}>
+                    {t.name}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#E2E8F0', mb: 1 }}>
+                    {t.type}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#E2E8F0' }}>
+                    ${t.price} - Capacity: {t.capacity}
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+          </Box>
+        );
+      
+      case 'itinerary':
+        return (
+          <Box>
+            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
+              Here's a suggested itinerary for your trip:
+            </Typography>
+            {response.content.days.map((day) => (
               <Paper
-                key={budget.level}
+                key={day.day}
                 elevation={0}
                 sx={{
                   p: 2,
                   borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  textAlign: 'center'
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  mb: 2,
+                  transition: 'transform 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    bgcolor: 'rgba(255,255,255,0.08)',
+                  }
                 }}
               >
-                <Typography variant="h3" sx={{ mb: 1, fontSize: '2rem' }}>{budget.icon}</Typography>
-                <Typography variant="h6" sx={{ mb: 0.5 }}>{budget.level}</Typography>
-                <Typography variant="subtitle1" color="primary.main" sx={{ fontWeight: 600, mb: 1 }}>
-                  {budget.cost}
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, color: '#B2F5EA' }}>
+                  Day {day.day}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">{budget.desc}</Typography>
+                {day.activities.map((activity, index) => (
+                  <Box key={index} sx={{ mb: 1 }}>
+                    <Typography variant="body2" sx={{ color: '#E2E8F0' }}>
+                      {activity.time}: {activity.activity.name}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#E2E8F0', ml: 2 }}>
+                      Transport: {activity.transport.name}
+                    </Typography>
+                  </Box>
+                ))}
+                <Typography variant="body2" sx={{ color: '#E2E8F0', mt: 1 }}>
+                  Accommodation: {day.accommodation.name}
+                </Typography>
               </Paper>
             ))}
           </Box>
-          <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-            What's your preferred budget range? I can help plan activities and accommodations accordingly!
-          </Typography>
-        </Box>
-      );
+        );
+      
+      case 'budget':
+        return (
+          <Box>
+            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
+              Budget Information
+            </Typography>
+            <Typography variant="body1" sx={{ color: '#E2E8F0' }}>
+              {response.content}
+            </Typography>
+          </Box>
+        );
+      
+      case 'location':
+        return (
+          <Box>
+            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
+              Available Locations
+            </Typography>
+            <Typography variant="body1" sx={{ color: '#E2E8F0' }}>
+              {response.content}
+            </Typography>
+          </Box>
+        );
+      
+      default:
+        return (
+          <Box>
+            <Typography variant="body1" sx={{ color: '#E2E8F0' }}>
+              {response.content}
+            </Typography>
+          </Box>
+        );
     }
-
-    return (
-      <Box>
-        <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', fontWeight: 600 }}>
-          Ready to Plan Your Sri Lankan Adventure! 🌴
-        </Typography>
-        <Box sx={{ 
-          display: 'grid',
-          gap: 2,
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-          mb: 2
-        }}>
-          {[
-            { title: 'Destinations', desc: 'Find the perfect places to visit', icon: '📍' },
-            { title: 'Trip Planning', desc: 'Customize your itinerary', icon: '📅' },
-            { title: 'Accommodations', desc: 'Find the best places to stay', icon: '🏨' },
-            { title: 'Activities', desc: 'Discover amazing experiences', icon: '🎯' }
-          ].map((service) => (
-            <Paper
-              key={service.title}
-              elevation={0}
-              sx={{
-                p: 2,
-                borderRadius: 2,
-                border: '1px solid',
-                borderColor: 'divider',
-                '&:hover': {
-                  bgcolor: 'action.hover'
-                }
-              }}
-            >
-              <Typography variant="h3" sx={{ mb: 1, fontSize: '2rem' }}>{service.icon}</Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{service.title}</Typography>
-              <Typography variant="body2" color="text.secondary">{service.desc}</Typography>
-            </Paper>
-          ))}
-        </Box>
-      </Box>
-    );
   };
 
   return (
-    <StyledContainer maxWidth="md">
-      <ThemeModeButton onClick={() => setIsDarkMode(!isDarkMode)}>
-        {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
-      </ThemeModeButton>
-      
-      <Paper 
-        elevation={0}
-        sx={{ 
-          height: '100%',
-          borderRadius: 4,
-          overflow: 'hidden',
-          backgroundColor: theme.palette.mode === 'dark' 
-            ? 'rgba(255,255,255,0.05)'
-            : theme.palette.background.paper,
-          display: 'flex',
-          flexDirection: 'column',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid',
-          borderColor: theme.palette.mode === 'dark'
-            ? 'rgba(255,255,255,0.1)'
-            : 'rgba(0,0,0,0.1)',
-          boxShadow: theme.palette.mode === 'dark'
-            ? '0 8px 32px rgba(0,0,0,0.4), 0 2px 16px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05)'
-            : '0 8px 32px rgba(0,0,0,0.1), 0 2px 16px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.05)',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          '&:hover': {
-            boxShadow: theme.palette.mode === 'dark'
-              ? '0 12px 48px rgba(0,0,0,0.5), 0 4px 24px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1)'
-              : '0 12px 48px rgba(0,0,0,0.15), 0 4px 24px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.1)',
-          }
-        }}
-      >
-        <ChatWindow
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          isTyping={isTyping}
-          isDarkMode={isDarkMode}
-        />
-      </Paper>
-
+    <StyledContainer>
+      <FloatingRobot>
+        <SmartToyIcon sx={{ fontSize: 120, color: '#B2F5EA', opacity: 0.8 }} />
+      </FloatingRobot>
+      <ChatWindow
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        isTyping={isTyping}
+        isDarkMode={true}
+      />
       <FloatingButtonContainer>
-        <Zoom in={showActions}>
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: 1,
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          }}>
-            {!isMobile && (
-              <>
-                <Fade in={showActions}>
-                  <FloatingActionButton
-                    startIcon={<ExploreOutlined />}
-                    onClick={() => handleSuggestionClick("I want to plan a new trip")}
-                  >
-                    Plan New Trip
-                  </FloatingActionButton>
-                </Fade>
-                <Fade in={showActions} style={{ transitionDelay: showActions ? '50ms' : '0ms' }}>
-                  <FloatingActionButton
-                    startIcon={<InfoOutlined />}
-                    onClick={() => handleSuggestionClick("Show me popular destinations")}
-                  >
-                    Popular Destinations
-                  </FloatingActionButton>
-                </Fade>
-                <Fade in={showActions} style={{ transitionDelay: showActions ? '100ms' : '0ms' }}>
-                  <FloatingActionButton
-                    startIcon={<AccessTimeOutlined />}
-                    onClick={() => handleSuggestionClick("When is the best time to visit?")}
-                  >
-                    Best Time to Visit
-                  </FloatingActionButton>
-                </Fade>
-                <Fade in={showActions} style={{ transitionDelay: showActions ? '150ms' : '0ms' }}>
-                  <FloatingActionButton
-                    startIcon={<AttachMoneyOutlined />}
-                    onClick={() => handleSuggestionClick("What's the typical budget needed?")}
-                  >
-                    Travel Budget
-                  </FloatingActionButton>
-                </Fade>
-              </>
-            )}
-      </Box>
-        </Zoom>
-        <SpeedDialButton 
+        <FloatingActionButton
           onClick={() => setShowActions(!showActions)}
-          sx={{
-            transform: showActions ? 'rotate(45deg)' : 'none',
-          }}
+          startIcon={<AddIcon />}
         >
-          {showActions ? <CloseIcon /> : <AddIcon />}
-        </SpeedDialButton>
+          {showActions ? 'Close' : 'Quick Actions'}
+        </FloatingActionButton>
+        {showActions && (
+          <Zoom in={showActions}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <SpeedDialButton onClick={() => handleSuggestionClick("Plan my trip")}>
+                <ExploreOutlined />
+              </SpeedDialButton>
+              <SpeedDialButton onClick={() => handleSuggestionClick("Show popular destinations")}>
+                <InfoOutlined />
+              </SpeedDialButton>
+      </Box>
+          </Zoom>
+        )}
       </FloatingButtonContainer>
     </StyledContainer>
   );
