@@ -12,6 +12,9 @@ import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import TripBot from './components/tripbot/TripBot';
 import AdminDashboard from './components/admin/AdminDashboard';
+import Accomodation from './components/accommodations/Accommodation';
+import AccommodationUpdt from './components/accommodations/AccommodationUpdt';
+import AccommodationEdit from './components/accommodations/AccommodationEdit';
 import Profile from './components/profile/Profile';
 
 // Protected Route Components
@@ -40,7 +43,7 @@ const DestinationManagement = () => (
 const AccommodationManagement = () => (
   <Box sx={{ p: 4 }}>
     <Typography variant="h4">Accommodation Management</Typography>
-    <Typography variant="body1" sx={{ mt: 2 }}>This section is under development by Team Member 2</Typography>
+    <Accomodation/>
   </Box>
 );
 
@@ -88,7 +91,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          
+          <Route path="/acc-updt" element={<AccommodationUpdt />} />
+          <Route path="/edit-accommodation" element={<AccommodationEdit />} />
           {/* Protected Routes */}
           <Route 
             path="/profile" 
