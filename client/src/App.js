@@ -13,6 +13,8 @@ import Register from './components/auth/Register';
 import TripBot from './components/tripbot/TripBot';
 import AdminDashboard from './components/admin/AdminDashboard';
 import Profile from './components/profile/Profile';
+import AdminGuides from './components/tours/AdminGuides';
+import TourGuides from './components/tours/UserGuides';
 
 // Protected Route Components
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -140,11 +142,28 @@ function App() {
               </ProtectedRoute>
             }
           />
-        </Routes>
+          <Route 
+            path="/admin/tours/addguides" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminGuides />
+              </ProtectedRoute>
+            } 
+          />
+        
+        <Route 
+            path="/tours/tourguides" 
+            element={
+              <ProtectedRoute>
+                <TourGuides />
+              </ProtectedRoute>
+            } 
+          />
+          </Routes>
       </Box>
       {shouldShowFooter && <Footer />}
     </Box>
   );
 }
 
-export default App; 
+export default App;
