@@ -16,6 +16,8 @@ import Accomodation from './components/accommodations/Accommodation';
 import AccommodationUpdt from './components/accommodations/AccommodationUpdt';
 import AccommodationEdit from './components/accommodations/AccommodationEdit';
 import Profile from './components/profile/Profile';
+import AdminGuides from './components/tours/AdminGuides';
+import TourGuides from './components/tours/UserGuides';
 
 // Protected Route Components
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -144,11 +146,28 @@ function App() {
               </ProtectedRoute>
             }
           />
-        </Routes>
+          <Route 
+            path="/admin/tours/addguides" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminGuides />
+              </ProtectedRoute>
+            } 
+          />
+        
+        <Route 
+            path="/tours/tourguides" 
+            element={
+              <ProtectedRoute>
+                <TourGuides />
+              </ProtectedRoute>
+            } 
+          />
+          </Routes>
       </Box>
       {shouldShowFooter && <Footer />}
     </Box>
   );
 }
 
-export default App; 
+export default App;
