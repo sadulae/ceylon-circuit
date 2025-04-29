@@ -1,143 +1,112 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
+// Create axios instance with base URL
+const api = axios.create({
+  baseURL: 'http://localhost:5000/api',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
 // Async thunks
 export const generateTripPlan = createAsyncThunk(
   'tripbot/generatePlan',
   async (preferences, { rejectWithValue }) => {
     try {
-      const response = await axios.post('/api/tripbot/generate-plan', preferences);
+      const response = await api.post('/tripbot/generate-plan', preferences);
       return response.data;
     } catch (err) {
-      return rejectWithValue(err.response.data);
+      return rejectWithValue(err.response?.data?.message || 'Failed to generate trip plan');
     }
   }
 );
 
-export const saveTripPlan = createAsyncThunk(
-  'tripbot/savePlan',
-  async (plan, { rejectWithValue }) => {
+export const getTripSuggestions = createAsyncThunk(
+  'tripbot/suggestions',
+  async (preferences, { rejectWithValue }) => {
     try {
-      const response = await axios.post('/api/tripbot/save-plan', plan);
+      const response = await api.post('/tripbot/suggestions', preferences);
       return response.data;
     } catch (err) {
-      return rejectWithValue(err.response.data);
+      return rejectWithValue(err.response?.data?.message || 'Failed to get trip suggestions');
     }
   }
 );
 
-export const getTripPlan = createAsyncThunk(
-  'tripbot/getPlan',
-  async (planId, { rejectWithValue }) => {
+export const getDestinationInfo = createAsyncThunk(
+  'tripbot/destination',
+  async (destination, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`/api/tripbot/plan/${planId}`);
+      const response = await api.get(`/tripbot/destination/${destination}`);
       return response.data;
     } catch (err) {
-      return rejectWithValue(err.response.data);
+      return rejectWithValue(err.response?.data?.message || 'Failed to get destination info');
     }
   }
 );
 
-export const updateTripPlan = createAsyncThunk(
-  'tripbot/updatePlan',
-  async ({ planId, updates }, { rejectWithValue }) => {
-    try {
-      const response = await axios.put(`/api/tripbot/plan/${planId}`, updates);
-      return response.data;
-    } catch (err) {
-      return rejectWithValue(err.response.data);
-    }
-  }
-);
-
+// Initial state
 const initialState = {
-  currentPlan: null,
-  savedPlans: [],
-  preferences: null,
+  tripPlan: null,
+  suggestions: null,
+  destinationInfo: null,
   loading: false,
-  error: null,
-  generatingPlan: false,
-  savingPlan: false
+  error: null
 };
 
+// Create slice
 const tripbotSlice = createSlice({
   name: 'tripbot',
   initialState,
   reducers: {
-    setPreferences: (state, action) => {
-      state.preferences = action.payload;
-    },
-    clearCurrentPlan: (state) => {
-      state.currentPlan = null;
-    },
     clearError: (state) => {
       state.error = null;
     }
   },
   extraReducers: (builder) => {
     builder
-      // Generate Plan
+      // Generate Trip Plan
       .addCase(generateTripPlan.pending, (state) => {
-        state.generatingPlan = true;
+        state.loading = true;
         state.error = null;
       })
       .addCase(generateTripPlan.fulfilled, (state, action) => {
-        state.generatingPlan = false;
-        state.currentPlan = action.payload;
+        state.loading = false;
+        state.tripPlan = action.payload;
       })
       .addCase(generateTripPlan.rejected, (state, action) => {
-        state.generatingPlan = false;
-        state.error = action.payload?.message || 'Failed to generate plan';
+        state.loading = false;
+        state.error = action.payload;
       })
-      
-      // Save Plan
-      .addCase(saveTripPlan.pending, (state) => {
-        state.savingPlan = true;
-        state.error = null;
-      })
-      .addCase(saveTripPlan.fulfilled, (state, action) => {
-        state.savingPlan = false;
-        state.savedPlans.push(action.payload);
-      })
-      .addCase(saveTripPlan.rejected, (state, action) => {
-        state.savingPlan = false;
-        state.error = action.payload?.message || 'Failed to save plan';
-      })
-      
-      // Get Plan
-      .addCase(getTripPlan.pending, (state) => {
+      // Get Trip Suggestions
+      .addCase(getTripSuggestions.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(getTripPlan.fulfilled, (state, action) => {
+      .addCase(getTripSuggestions.fulfilled, (state, action) => {
         state.loading = false;
-        state.currentPlan = action.payload;
+        state.suggestions = action.payload;
       })
-      .addCase(getTripPlan.rejected, (state, action) => {
+      .addCase(getTripSuggestions.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to fetch plan';
+        state.error = action.payload;
       })
-      
-      // Update Plan
-      .addCase(updateTripPlan.pending, (state) => {
+      // Get Destination Info
+      .addCase(getDestinationInfo.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(updateTripPlan.fulfilled, (state, action) => {
+      .addCase(getDestinationInfo.fulfilled, (state, action) => {
         state.loading = false;
-        state.currentPlan = action.payload;
-        const index = state.savedPlans.findIndex(plan => plan._id === action.payload._id);
-        if (index !== -1) {
-          state.savedPlans[index] = action.payload;
-        }
+        state.destinationInfo = action.payload;
       })
-      .addCase(updateTripPlan.rejected, (state, action) => {
+      .addCase(getDestinationInfo.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to update plan';
+        state.error = action.payload;
       });
   }
 });
 
-export const { setPreferences, clearCurrentPlan, clearError } = tripbotSlice.actions;
-
+export const { clearError } = tripbotSlice.actions;
 export default tripbotSlice.reducer;

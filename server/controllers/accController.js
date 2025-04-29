@@ -1,131 +1,146 @@
-const Accommodation = require('../models/accModels');
-const jwt = require('jsonwebtoken');
-
+import jwt from 'jsonwebtoken';
+import Accommodation from '../models/accModels.js';
+import { createError } from '../utils/error.js';
 
 // @desc    Register accommodation
 // @route   POST /api/accommodation/add
-// @access  Public
-exports.registerAccommodation = async (req, res) => {
+// @access  Private/Admin
+export const registerAccommodation = async (req, res, next) => {
   try {
-    console.log("datarece", req.body)
-    console.log("accName", req.body.accName)
-    console.log("location", req.body.location)
+    console.log('Accommodation registration request body:', req.body);
+    const { 
+      accName, 
+      location, 
+      address, 
+      availableSingleRooms, 
+      availableDoubleRooms, 
+      availableRooms, 
+      facilities 
+    } = req.body;
 
-    const { accName , location, address, availableSingleRooms ,availableDoubleRooms ,availableRooms ,facilities } = req.body;
-    console.log("accName", req.body.accName)
-    console.log("location", req.body.location)
-    console.log("address", address)
-    console.log("availableSingleRooms", availableSingleRooms)
-    console.log("availableDoubleRooms", availableDoubleRooms)
-    console.log("facilities", facilities)
-    
-
-    // Validate required fields
-    if (!accName || !location || !address || !availableSingleRooms ||!availableDoubleRooms || !availableRooms || !facilities) {
-      return res.status(400).json({ message: 'Please provide all required fields' });
+    // Check if required fields are present
+    if (!accName || !location || !address) {
+      console.log('Missing required fields in request:', { accName, location, address });
+      return next(createError(400, "Missing required fields"));
     }
 
     // Check if accommodation already exists
-    const existingAccommodation = await Accommodation.findOne({ accName, location });
-    if (existingAccommodation) {
-      return res.status(400).json({ message: 'Accommodation already registered' });
+    const existingAcc = await Accommodation.findOne({ accName });
+    if (existingAcc) {
+      return next(createError(400, "Accommodation already exists"));
     }
 
-    // Create accommodation
-    const accommodation = await Accommodation.create({
+    // Create new accommodation
+    const newAccommodation = new Accommodation({
       accName,
       location,
       address,
-      availableSingleRooms,
-      availableDoubleRooms,
-      availableRooms,
-      facilities
+      availableSingleRooms: availableSingleRooms || 0,
+      availableDoubleRooms: availableDoubleRooms || 0,
+      availableRooms: availableRooms || 0,
+      facilities: facilities || []
     });
 
-    res.status(201).json({ success: true, accommodation });
-  } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ message: 'Registration failed. Please try again.' });
+    await newAccommodation.save();
+
+    console.log('Accommodation created successfully:', newAccommodation);
+
+    res.status(201).json({
+      success: true,
+      message: "Accommodation registered successfully",
+      data: newAccommodation
+    });
+  } catch (error) {
+    console.error('Error creating accommodation:', error);
+    next(error);
   }
 };
 
 // @desc    Get all accommodations
-// @route   GET /api/accommodations
+// @route   GET /api/accommodation/fetchAll
 // @access  Public
-exports.getAccommodations = async (req, res) => {
-  console.log("inside")
+export const getAccommodations = async (req, res, next) => {
   try {
     const accommodations = await Accommodation.find();
-    console.log("accommodations",accommodations)
-    res.json({ success: true, accommodations });
-  } catch (err) {
-    console.error('Error fetching accommodations:', err);
-    res.status(500).json({ message: 'Error retrieving accommodations' });
+    console.log("Server: Fetched accommodations count:", accommodations.length);
+    
+    // Use consistent response format
+    res.status(200).json({
+      success: true,
+      count: accommodations.length,
+      accommodations: accommodations // Use 'accommodations' field consistently
+    });
+  } catch (error) {
+    console.error("Server: Error fetching accommodations:", error);
+    next(error);
   }
 };
 
 // @desc    Get accommodation by ID
-// @route   GET /api/accommodations/:id
+// @route   GET /api/accommodation/:id
 // @access  Public
-exports.getAccommodationById = async (req, res) => {
+export const getAccommodation = async (req, res, next) => {
   try {
     const accommodation = await Accommodation.findById(req.params.id);
     if (!accommodation) {
-      return res.status(404).json({ message: 'Accommodation not found' });
+      return next(createError(404, "Accommodation not found"));
     }
-    res.json({ success: true, accommodation });
-  } catch (err) {
-    console.error('Error fetching accommodation:', err);
-    res.status(500).json({ message: 'Error retrieving accommodation' });
+    res.status(200).json({
+      success: true,
+      data: accommodation
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
 // @desc    Update accommodation details
-// @route   PUT /api/accommodations/:id
-// @access  Private (Admin only)
-exports.updateAccommodation = async (req, res) => {
+// @route   PUT /api/accommodation/update/:id
+// @access  Private/Admin
+export const updateAccommodation = async (req, res, next) => {
   try {
-    const { accName , location, address, availableSingleRooms ,availableDoubleRooms ,availableRooms ,facilities } = req.body;
+    const { accName, location, address, contact, email, description, roomTypes } = req.body;
 
-    const updatedAccommodation = await Accommodation.findByIdAndUpdate(
-      req.params.id,
-      {
-        $set: {
-          accName: accName || undefined,
-          location: location || undefined,
-          address: address || undefined,
-          availableSingleRooms: availableSingleRooms || undefined,
-          availableDoubleRooms: availableDoubleRooms || undefined,
-          availableRooms: availableRooms || undefined,
-          facilities: facilities || undefined,
-        }
-      },
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedAccommodation) {
-      return res.status(404).json({ message: 'Accommodation not found' });
+    const accommodation = await Accommodation.findById(req.params.id);
+    if (!accommodation) {
+      return next(createError(404, "Accommodation not found"));
     }
 
-    res.json({ success: true, accommodation: updatedAccommodation });
-  } catch (err) {
-    console.error('Update error:', err);
-    res.status(500).json({ message: 'Error updating accommodation' });
+    // Update fields
+    if (accName) accommodation.accName = accName;
+    if (location) accommodation.location = location;
+    if (address) accommodation.address = address;
+    if (contact) accommodation.contact = contact;
+    if (email) accommodation.email = email;
+    if (description) accommodation.description = description;
+    if (roomTypes) accommodation.roomTypes = roomTypes;
+
+    await accommodation.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Accommodation updated successfully",
+      data: accommodation
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
 // @desc    Delete accommodation
-// @route   DELETE /api/accommodations/:id
-// @access  Private (Admin only)
-exports.deleteAccommodation = async (req, res) => {
+// @route   DELETE /api/accommodation/delete/:id
+// @access  Private/Admin
+export const deleteAccommodation = async (req, res, next) => {
   try {
     const accommodation = await Accommodation.findByIdAndDelete(req.params.id);
     if (!accommodation) {
-      return res.status(404).json({ message: 'Accommodation not found' });
+      return next(createError(404, "Accommodation not found"));
     }
-    res.json({ success: true, message: 'Accommodation deleted successfully' });
-  } catch (err) {
-    console.error('Delete error:', err);
-    res.status(500).json({ message: 'Error deleting accommodation' });
+    res.status(200).json({
+      success: true,
+      message: "Accommodation deleted successfully"
+    });
+  } catch (error) {
+    next(error);
   }
 };

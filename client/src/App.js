@@ -18,6 +18,24 @@ import AccommodationEdit from './components/accommodations/AccommodationEdit';
 import Profile from './components/profile/Profile';
 import AdminGuides from './components/tours/AdminGuides';
 import TourGuides from './components/tours/UserGuides';
+import TourManagement from './components/tours/TourManagement';
+import TourPackageBuilder from './components/tours/TourPackageBuilder';
+import TourEdit from './components/tours/TourEdit';
+import DestinationList from './components/destinations/DestinationList';
+import DestinationForm from './components/destinations/DestinationForm';
+import DestinationDetail from './components/destinations/DestinationDetail';
+
+// Admin components
+// Uncomment or add these imports when the components are available
+// import AdminLayout from './components/admin/AdminLayout';
+// import UserList from './components/admin/UserList';
+// import TourList from './components/admin/TourList';
+// import GuideList from './components/admin/GuideList';
+// import AccommodationList from './components/admin/AccommodationList';
+// import AccommodationForm from './components/admin/AccommodationForm';
+// import AccommodationDetail from './components/admin/AccommodationDetail';
+// import ReportList from './components/admin/ReportList';
+// import Settings from './components/admin/Settings';
 
 // Protected Route Components
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -27,7 +45,8 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     return <Navigate to="/login" />;
   }
 
-  if (allowedRoles.length > 0 && (!user?.role || !allowedRoles.includes(user.role))) {
+  // Check if route requires admin access
+  if (allowedRoles.includes('admin') && !user?.isAdmin) {
     return <Navigate to="/" />;
   }
 
@@ -46,13 +65,6 @@ const AccommodationManagement = () => (
   <Box sx={{ p: 4 }}>
     <Typography variant="h4">Accommodation Management</Typography>
     <Accomodation/>
-  </Box>
-);
-
-const TourManagement = () => (
-  <Box sx={{ p: 4 }}>
-    <Typography variant="h4">Tour Package Management</Typography>
-    <Typography variant="body1" sx={{ mt: 2 }}>This section is under development by Team Member 3</Typography>
   </Box>
 );
 
@@ -126,7 +138,31 @@ function App() {
             path="/admin/destinations"
             element={
               <ProtectedRoute allowedRoles={['admin']}>
-                <DestinationManagement />
+                <DestinationList isAdmin={true} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/destinations/add"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <DestinationForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/destinations/edit/:id"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <DestinationForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/destinations/:id"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <DestinationDetail isAdmin={true} />
               </ProtectedRoute>
             }
           />
@@ -134,7 +170,7 @@ function App() {
             path="/admin/accommodations"
             element={
               <ProtectedRoute allowedRoles={['admin']}>
-                <AccommodationManagement />
+                <Accomodation />
               </ProtectedRoute>
             }
           />
@@ -154,6 +190,22 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/admin/tours/create-package" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <TourPackageBuilder />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/tour-edit" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <TourEdit />
+              </ProtectedRoute>
+            } 
+          />
         
         <Route 
             path="/tours/tourguides" 
@@ -163,6 +215,30 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          {/* Public destination routes */}
+          <Route path="/destinations" element={<DestinationList />} />
+          <Route path="/destinations/:id" element={<DestinationDetail />} />
+          
+          {/* The following Admin Layout route structure needs to be implemented once
+              all the required components are available
+          
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="users" element={<UserList />} />
+            <Route path="tours" element={<TourList />} />
+            <Route path="guides" element={<GuideList />} />
+            <Route path="accommodations" element={<AccommodationList />} />
+            <Route path="accommodations/add" element={<AccommodationForm />} />
+            <Route path="accommodations/edit/:id" element={<AccommodationForm />} />
+            <Route path="accommodations/:id" element={<AccommodationDetail />} />
+            <Route path="destinations" element={<DestinationList />} />
+            <Route path="destinations/add" element={<DestinationForm />} />
+            <Route path="destinations/edit/:id" element={<DestinationForm />} />
+            <Route path="destinations/:id" element={<DestinationDetail />} />
+            <Route path="reports" element={<ReportList />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+          */}
           </Routes>
       </Box>
       {shouldShowFooter && <Footer />}

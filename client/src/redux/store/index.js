@@ -1,11 +1,13 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../slices/authSlice';
 import tripbotReducer from '../slices/tripbotSlice';
+import destinationReducer from '../slices/destinationSlice';
 
 const store = configureStore({
   reducer: {
     auth: authReducer,
-    tripbot: tripbotReducer
+    tripbot: tripbotReducer,
+    destinations: destinationReducer
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Container, Paper, Typography, Button, IconButton, Zoom, Fade, useTheme, useMediaQuery } from '@mui/material';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Box, Container, Paper, Typography, Button, IconButton, Zoom, Fade, useTheme, useMediaQuery, LinearProgress } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ChatWindow from './chat/ChatWindow';
 import { 
@@ -11,10 +11,12 @@ import {
   Add as AddIcon,
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
-  SmartToy as SmartToyIcon
+  SmartToy as SmartToyIcon,
+  SaveAlt as SaveIcon,
+  Share as ShareIcon
 } from '@mui/icons-material';
-import { generateAIResponse } from '../../services/aiService';
-import { testHuggingFaceAPI } from '../../services/testApi';
+import { sendMessageToAI } from '../../services/aiService';
+import TripPlanViewer from './TripPlanViewer';
 
 const StyledContainer = styled(Container)(({ theme }) => ({
   position: 'fixed',
@@ -136,53 +138,62 @@ const SpeedDialButton = styled(IconButton)(({ theme }) => ({
   boxShadow: '0 8px 16px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
 }));
 
+const SuggestionButton = styled(Button)(({ theme }) => ({
+  borderRadius: '28px',
+  padding: theme.spacing(1, 2),
+  margin: theme.spacing(0.5),
+  textTransform: 'none',
+  fontWeight: 500,
+  backgroundColor: 'rgba(178,245,234,0.1)',
+  color: '#B2F5EA',
+  border: '1px solid rgba(178,245,234,0.2)',
+  backdropFilter: 'blur(8px)',
+  transition: 'all 0.2s',
+  '&:hover': {
+    backgroundColor: 'rgba(178,245,234,0.2)',
+    transform: 'translateY(-2px)',
+    boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+  },
+}));
+
+const TripPlanContainer = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(3),
+  borderRadius: theme.spacing(2),
+  background: 'rgba(15, 23, 42, 0.8)',
+  backdropFilter: 'blur(12px)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  color: '#fff',
+  boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+  overflow: 'auto',
+  margin: theme.spacing(2, 0),
+  maxHeight: '60vh',
+  transition: 'all 0.3s ease',
+  position: 'relative',
+}));
+
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const TripBot = () => {
   const [messages, setMessages] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [showActions, setShowActions] = useState(false);
-  const [context, setContext] = useState({});
-  const [apiStatus, setApiStatus] = useState('checking'); // 'checking', 'connected', 'error'
+  const [sessionId, setSessionId] = useState(null);
+  const [currentPlan, setCurrentPlan] = useState(null);
+  const [showPlanViewer, setShowPlanViewer] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const planRef = useRef(null);
 
-  // Test API connection on component mount
-  useEffect(() => {
-    const checkApiConnection = async () => {
-      try {
-        await testHuggingFaceAPI();
-        setApiStatus('connected');
-        console.log('API connection successful');
-      } catch (error) {
-        console.error('API connection failed:', error);
-        setApiStatus('error');
-        // Add error message to chat
-        setMessages(prev => [...prev, {
-          id: generateId(),
-          type: 'bot',
-          content: (
-            <Box>
-              <Typography variant="body1" color="error" gutterBottom>
-                I'm having trouble connecting to my AI service.
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                I'll still help you with basic travel information while we resolve this issue.
-              </Typography>
-            </Box>
-          ),
-          timestamp: new Date()
-        }]);
-      }
-    };
+  // Suggested messages to help users get started
+  const suggestedMessages = [
+    "I want to plan a trip to Sri Lanka for 7 days",
+    "What are the best beaches to visit?",
+    "I'm interested in wildlife and hiking",
+    "Create an itinerary for Kandy and Ella"
+  ];
 
-    checkApiConnection();
-  }, []);
-
-  const handleSuggestionClick = useCallback((suggestion) => {
-    handleSendMessage(suggestion);
-  }, []);
-
+  // Initialize chat with welcome message
   useEffect(() => {
     const welcomeMessage = {
       id: generateId(),
@@ -197,7 +208,7 @@ const TripBot = () => {
             Ayubowan! 👋
           </Typography>
           <Typography variant="body1" gutterBottom sx={{ color: '#E2E8F0', mb: 3 }}>
-            I'm your personal travel assistant for planning the perfect Sri Lankan adventure. How can I help you today?
+            I'm your AI travel assistant for planning the perfect Sri Lankan adventure. I can create personalized itineraries based on your preferences and our extensive database of destinations, accommodations, and tour packages.
           </Typography>
           <Box sx={{ 
             display: 'grid', 
@@ -223,13 +234,26 @@ const TripBot = () => {
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     bgcolor: 'rgba(255,255,255,0.08)',
+                    cursor: 'pointer'
                   }
                 }}
+                onClick={() => handleSendMessage(`Tell me about ${place.name}`)}
               >
                 <Typography variant="h3" sx={{ mb: 1, fontSize: '2rem' }}>{place.icon}</Typography>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, color: '#B2F5EA' }}>{place.name}</Typography>
                 <Typography variant="body2" sx={{ color: '#E2E8F0' }}>{place.desc}</Typography>
               </Paper>
+            ))}
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', mt: 3 }}>
+            {suggestedMessages.map((msg, index) => (
+              <SuggestionButton 
+                key={index}
+                onClick={() => handleSendMessage(msg)}
+                startIcon={index % 2 === 0 ? <ExploreOutlined /> : <AccessTimeOutlined />}
+              >
+                {msg}
+              </SuggestionButton>
             ))}
           </Box>
         </Box>
@@ -239,7 +263,219 @@ const TripBot = () => {
     setMessages([welcomeMessage]);
   }, []);
 
+  // Handle scroll to plan when it's rendered
+  useEffect(() => {
+    if (showPlanViewer && planRef.current) {
+      planRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [showPlanViewer]);
+
+  // Format AI response based on type
+  const formatBotResponse = (response) => {
+    // Extract main content from response
+    const { type, content, sessionId: responseSessionId } = response;
+    
+    // Update session ID if returned
+    if (responseSessionId) {
+      setSessionId(responseSessionId);
+    }
+    
+    // Handle different response types
+    if (type === 'text') {
+      return {
+        id: generateId(),
+        type: 'bot',
+        content: (
+          <Typography variant="body1" sx={{ color: '#E2E8F0' }}>
+            {content}
+          </Typography>
+        ),
+        timestamp: new Date()
+      };
+    }
+    
+    if (type === 'preferences_request') {
+      return {
+        id: generateId(),
+        type: 'bot',
+        content: (
+          <Box>
+            <Typography variant="body1" sx={{ color: '#E2E8F0', mb: 2 }}>
+              {content}
+            </Typography>
+            <Box sx={{ 
+              display: 'flex', 
+              flexWrap: 'wrap', 
+              gap: 1, 
+              justifyContent: { xs: 'center', sm: 'flex-start' } 
+            }}>
+              {response.missingInfo.includes('destinations') && (
+                <SuggestionButton 
+                  onClick={() => handleSendMessage("I want to visit Kandy, Sigiriya, and Ella")}
+                  startIcon={<ExploreOutlined />}
+                >
+                  Popular destinations
+                </SuggestionButton>
+              )}
+              {response.missingInfo.includes('trip duration') && (
+                <SuggestionButton 
+                  onClick={() => handleSendMessage("I'm planning a 7-day trip")}
+                  startIcon={<AccessTimeOutlined />}
+                >
+                  7-day trip
+                </SuggestionButton>
+              )}
+              {response.missingInfo.includes('interests') && (
+                <SuggestionButton 
+                  onClick={() => handleSendMessage("I'm interested in beaches, wildlife, and cultural sites")}
+                  startIcon={<InfoOutlined />}
+                >
+                  My interests
+                </SuggestionButton>
+              )}
+            </Box>
+          </Box>
+        ),
+        timestamp: new Date()
+      };
+    }
+    
+    if (type === 'trip_plan') {
+      // Store trip plan in state for detailed viewing
+      setCurrentPlan(content);
+      setShowPlanViewer(true);
+      
+      // Return summarized version for chat
+      return {
+        id: generateId(),
+        type: 'bot',
+        content: (
+          <Box>
+            <Typography variant="body1" sx={{ color: '#E2E8F0', mb: 2 }}>
+              {content.summary}
+            </Typography>
+            
+            <TripPlanContainer ref={planRef}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ color: '#B2F5EA', fontWeight: 600 }}>
+                  Your Trip Plan
+                </Typography>
+                <Box>
+                  <IconButton 
+                    sx={{ color: '#B2F5EA' }}
+                    onClick={() => setShowPlanViewer(state => !state)}
+                  >
+                    {showPlanViewer ? <CloseIcon /> : <SmartToyIcon />}
+                  </IconButton>
+                </Box>
+              </Box>
+              
+              {showPlanViewer && (
+                <TripPlanViewer 
+                  plan={content} 
+                  onSave={handleSavePlan}
+                  onModify={() => handleSendMessage("I'd like to modify this plan")}
+                />
+              )}
+              
+              {!showPlanViewer && (
+                <Button 
+                  fullWidth 
+                  variant="outlined" 
+                  sx={{ 
+                    borderColor: 'rgba(178,245,234,0.3)', 
+                    color: '#B2F5EA',
+                    mt: 1,
+                    '&:hover': {
+                      borderColor: 'rgba(178,245,234,0.6)',
+                      backgroundColor: 'rgba(178,245,234,0.1)'
+                    }
+                  }}
+                  onClick={() => setShowPlanViewer(true)}
+                >
+                  View Complete Itinerary
+                </Button>
+              )}
+            </TripPlanContainer>
+            
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
+              <SuggestionButton 
+                onClick={() => handleSendMessage("Can you modify this plan to include more beaches?")}
+                startIcon={<ExploreOutlined />}
+              >
+                Add more beaches
+              </SuggestionButton>
+              <SuggestionButton 
+                onClick={() => handleSendMessage("I'd like to extend this trip to 10 days")}
+                startIcon={<AccessTimeOutlined />}
+              >
+                Extend trip
+              </SuggestionButton>
+              <SuggestionButton 
+                onClick={() => handleSendMessage("Save this trip plan")}
+                startIcon={<SaveIcon />}
+              >
+                Save plan
+              </SuggestionButton>
+            </Box>
+          </Box>
+        ),
+        timestamp: new Date()
+      };
+    }
+    
+    if (type === 'confirmation') {
+      return {
+        id: generateId(),
+        type: 'bot',
+        content: (
+          <Box>
+            <Typography variant="body1" sx={{ color: '#E2E8F0', mb: 2 }}>
+              {content.message}
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <SuggestionButton 
+                onClick={() => handleSendMessage("Yes, I'd like to proceed with booking")}
+                startIcon={<SaveIcon />}
+                sx={{ backgroundColor: 'rgba(52,211,153,0.2)' }}
+              >
+                Proceed to booking
+              </SuggestionButton>
+              <SuggestionButton 
+                onClick={() => handleSendMessage("I'd like to make changes")}
+              >
+                Make changes
+              </SuggestionButton>
+              <SuggestionButton 
+                onClick={() => handleSendMessage("Share this plan")}
+                startIcon={<ShareIcon />}
+              >
+                Share plan
+              </SuggestionButton>
+            </Box>
+          </Box>
+        ),
+        timestamp: new Date(),
+        planId: content.planId
+      };
+    }
+    
+    // Default format for unknown response types
+    return {
+      id: generateId(),
+      type: 'bot',
+      content: (
+        <Typography variant="body1" sx={{ color: '#E2E8F0' }}>
+          {typeof content === 'string' ? content : 'I\'ve processed your request. What else would you like to know?'}
+        </Typography>
+      ),
+      timestamp: new Date()
+    };
+  };
+
+  // Handler for sending messages
   const handleSendMessage = async (message) => {
+    // Add user message to chat
     const userMessage = {
       id: generateId(),
       type: 'user',
@@ -251,284 +487,90 @@ const TripBot = () => {
     setShowActions(false);
 
     try {
-      const response = await generateAIResponse(message, context);
+      // Send message to AI service with session ID if available
+      const response = await sendMessageToAI(message, sessionId);
       
-      // Update context based on the response
-      if (response.type === 'accommodation' && Array.isArray(response.content)) {
-        setContext(prev => ({ ...prev, location: response.content[0]?.location }));
-      }
-      
-      const botMessage = {
-        id: generateId(),
-        type: 'bot',
-        content: formatBotResponse(response),
-        timestamp: new Date()
-      };
-      
+      // Format and add AI response to chat
+      const botMessage = formatBotResponse(response);
       setMessages(prev => [...prev, botMessage]);
+      
     } catch (error) {
-      console.error('Error generating response:', error);
-      const errorMessage = {
+      console.error('Error sending message to AI:', error);
+      
+      // Add error message to chat
+      setMessages(prev => [...prev, {
         id: generateId(),
         type: 'bot',
         content: (
           <Box>
             <Typography variant="body1" color="error" gutterBottom>
-              I apologize, but I encountered an error processing your request.
+              I'm having trouble connecting to my AI service.
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Please try rephrasing your question or ask about something else.
+            <Typography variant="body2" sx={{ color: '#E2E8F0' }}>
+              Please try again later or contact support if the problem persists.
             </Typography>
           </Box>
         ),
         timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      }]);
     } finally {
       setIsTyping(false);
     }
   };
 
-  const formatBotResponse = (response) => {
-    switch (response.type) {
-      case 'accommodation':
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-              Here are some accommodations that match your preferences:
-            </Typography>
-            <Box sx={{ 
-              display: 'grid', 
-              gap: 2,
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-              mb: 2
-            }}>
-              {response.content.map((acc) => (
-                <Paper
-                  key={acc.name}
-                  elevation={0}
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    transition: 'transform 0.2s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      bgcolor: 'rgba(255,255,255,0.08)',
-                    }
-                  }}
-                >
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, color: '#B2F5EA' }}>
-                    {acc.name}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#E2E8F0', mb: 1 }}>
-                    {acc.location}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#E2E8F0' }}>
-                    ${acc.price} per night
-                  </Typography>
-                </Paper>
-              ))}
-            </Box>
-          </Box>
-        );
-      
-      case 'activity':
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-              Here are some activities you might enjoy:
-            </Typography>
-            <Box sx={{ 
-              display: 'grid', 
-              gap: 2,
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-              mb: 2
-            }}>
-              {response.content.map((activity) => (
-                <Paper
-                  key={activity.name}
-                  elevation={0}
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    transition: 'transform 0.2s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      bgcolor: 'rgba(255,255,255,0.08)',
-                    }
-                  }}
-                >
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, color: '#B2F5EA' }}>
-                    {activity.name}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#E2E8F0', mb: 1 }}>
-                    {activity.location}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#E2E8F0' }}>
-                    ${activity.price} - {activity.duration}
-                  </Typography>
-                </Paper>
-              ))}
-            </Box>
-          </Box>
-        );
-      
-      case 'transport':
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-              Here are some transport options:
-            </Typography>
-            <Box sx={{ 
-              display: 'grid', 
-              gap: 2,
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-              mb: 2
-            }}>
-              {response.content.map((t) => (
-                <Paper
-                  key={t.name}
-                  elevation={0}
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    transition: 'transform 0.2s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      bgcolor: 'rgba(255,255,255,0.08)',
-                    }
-                  }}
-                >
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, color: '#B2F5EA' }}>
-                    {t.name}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#E2E8F0', mb: 1 }}>
-                    {t.type}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#E2E8F0' }}>
-                    ${t.price} - Capacity: {t.capacity}
-                  </Typography>
-                </Paper>
-              ))}
-            </Box>
-          </Box>
-        );
-      
-      case 'itinerary':
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-              Here's a suggested itinerary for your trip:
-            </Typography>
-            {response.content.days.map((day) => (
-              <Paper
-                key={day.day}
-                elevation={0}
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  bgcolor: 'rgba(255,255,255,0.05)',
-                  mb: 2,
-                  transition: 'transform 0.2s ease',
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    bgcolor: 'rgba(255,255,255,0.08)',
-                  }
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, color: '#B2F5EA' }}>
-                  Day {day.day}
-                </Typography>
-                {day.activities.map((activity, index) => (
-                  <Box key={index} sx={{ mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: '#E2E8F0' }}>
-                      {activity.time}: {activity.activity.name}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#E2E8F0', ml: 2 }}>
-                      Transport: {activity.transport.name}
-                    </Typography>
-                  </Box>
-                ))}
-                <Typography variant="body2" sx={{ color: '#E2E8F0', mt: 1 }}>
-                  Accommodation: {day.accommodation.name}
-                </Typography>
-              </Paper>
-            ))}
-          </Box>
-        );
-      
-      case 'budget':
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-              Budget Information
-            </Typography>
-            <Typography variant="body1" sx={{ color: '#E2E8F0' }}>
-              {response.content}
-            </Typography>
-          </Box>
-        );
-      
-      case 'location':
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-              Available Locations
-            </Typography>
-            <Typography variant="body1" sx={{ color: '#E2E8F0' }}>
-              {response.content}
-            </Typography>
-          </Box>
-        );
-      
-      default:
-        return (
-          <Box>
-            <Typography variant="body1" sx={{ color: '#E2E8F0' }}>
-              {response.content}
-            </Typography>
-          </Box>
-        );
+  // Handler for suggestion clicks
+  const handleSuggestionClick = useCallback((suggestion) => {
+    handleSendMessage(suggestion);
+  }, []);
+
+  // Handler for saving trip plan
+  const handleSavePlan = async () => {
+    if (!currentPlan) return;
+    
+    setIsTyping(true);
+    try {
+      // Call save plan endpoint
+      const saveMessage = "I'd like to save this trip plan";
+      await handleSendMessage(saveMessage);
+    } catch (error) {
+      console.error('Error saving plan:', error);
+      setMessages(prev => [...prev, {
+        id: generateId(),
+        type: 'bot',
+        content: (
+          <Typography variant="body1" color="error">
+            There was an error saving your plan. Please try again.
+          </Typography>
+        ),
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsTyping(false);
     }
   };
 
   return (
-    <StyledContainer>
-      <FloatingRobot>
-        <SmartToyIcon sx={{ fontSize: 120, color: '#B2F5EA', opacity: 0.8 }} />
-      </FloatingRobot>
-      <ChatWindow
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        isTyping={isTyping}
-        isDarkMode={true}
-      />
-      <FloatingButtonContainer>
-        <FloatingActionButton
-          onClick={() => setShowActions(!showActions)}
-          startIcon={<AddIcon />}
-        >
-          {showActions ? 'Close' : 'Quick Actions'}
-        </FloatingActionButton>
-        {showActions && (
-          <Zoom in={showActions}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <SpeedDialButton onClick={() => handleSuggestionClick("Plan my trip")}>
-                <ExploreOutlined />
-              </SpeedDialButton>
-              <SpeedDialButton onClick={() => handleSuggestionClick("Show popular destinations")}>
-                <InfoOutlined />
-              </SpeedDialButton>
+    <StyledContainer maxWidth="xl">
+      <Box sx={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <ChatWindow 
+          messages={messages} 
+          onSendMessage={handleSendMessage} 
+          isTyping={isTyping}
+          disabled={false}
+          isDarkMode={isDarkMode}
+          sx={{ flexGrow: 1 }}
+        />
       </Box>
-          </Zoom>
-        )}
+      
+      <FloatingButtonContainer>
+        <Zoom in={true} style={{ transitionDelay: '300ms' }}>
+          <SpeedDialButton 
+            aria-label="Theme toggle"
+            onClick={() => setIsDarkMode(!isDarkMode)}
+          >
+            {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
+          </SpeedDialButton>
+        </Zoom>
       </FloatingButtonContainer>
     </StyledContainer>
   );

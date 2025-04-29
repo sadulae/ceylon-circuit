@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const activitySchema = new mongoose.Schema({
   time: {
@@ -106,4 +106,6 @@ tripPlanSchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('TripPlan', tripPlanSchema); 
+const TripPlan = mongoose.model('TripPlan', tripPlanSchema);
+
+export default TripPlan; 

@@ -22,7 +22,7 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    usernameOrEmail: '',
+    email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -62,12 +62,17 @@ const Login = () => {
     try {
       const redirectPath = localStorage.getItem('redirectPath') || '/';
       const result = await dispatch(login(formData)).unwrap();
+      console.log('Login response:', result);
+      
       localStorage.removeItem('redirectPath');
       
-      // If user is admin, redirect to admin dashboard
-      if (result.user.role === 'admin') {
+      // Check if the user is an admin from the response
+      console.log('User isAdmin:', result?.isAdmin);
+      if (result?.isAdmin) {
+        console.log('Redirecting to admin dashboard');
         navigate('/admin');
       } else {
+        console.log('Redirecting to home page');
         navigate(redirectPath);
       }
     } catch (err) {
@@ -137,12 +142,12 @@ const Login = () => {
               margin="normal"
               required
               fullWidth
-              id="usernameOrEmail"
-              label="Username or Email"
-              name="usernameOrEmail"
+              id="email"
+              label="Email"
+              name="email"
               autoComplete="email"
               autoFocus
-              value={formData.usernameOrEmail}
+              value={formData.email}
               onChange={handleChange}
               InputProps={{
                 startAdornment: (
@@ -248,7 +253,6 @@ const Login = () => {
                 fontWeight: 600,
                 '&:hover': {
                   bgcolor: 'transparent',
-                  color: '#38A89D'
                 }
               }}
             >

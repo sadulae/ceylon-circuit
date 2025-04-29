@@ -1,49 +1,43 @@
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const User = require('../models/User');
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import User from '../models/User.js';
 
+// Load env vars
 dotenv.config();
 
+const adminUser = {
+    username: 'admin',
+    email: 'admin@ceyloncircuit.com',
+    password: 'admin123',
+    firstName: 'Admin',
+    lastName: 'User',
+    role: 'admin',
+    phone: '1234567890',
+    location: 'Colombo',
+    bio: 'System Administrator'
+};
+
 const seedAdmin = async () => {
-  try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
+    try {
+        // Connect to MongoDB
+        await mongoose.connect(process.env.MONGODB_URI);
+        console.log('MongoDB Connected');
 
-    console.log('Connected to MongoDB successfully');
+        // Check if admin already exists
+        const existingAdmin = await User.findOne({ email: adminUser.email });
+        if (existingAdmin) {
+            console.log('Admin user already exists');
+            process.exit();
+        }
 
-    // Delete existing admin if exists
-    await User.deleteOne({ email: 'admin@ceyloncircuit.com' });
-    console.log('Cleaned up existing admin user');
-
-    // Create admin user without hashing password (model will handle it)
-    const adminUser = new User({
-      username: 'admin',
-      email: 'admin@ceyloncircuit.com',
-      password: 'admin123',  // Model middleware will hash this
-      firstName: 'Admin',
-      lastName: 'User',
-      role: 'admin',
-      phone: '+94 11 234 5678',
-      location: 'Colombo, Sri Lanka',
-      bio: 'System Administrator for Ceylon Circuit',
-      interests: ['Travel Management', 'System Administration', 'Customer Service']
-    });
-
-    await adminUser.save();
-    console.log('Admin user created successfully');
-    console.log('Admin Credentials:');
-    console.log('Email: admin@ceyloncircuit.com');
-    console.log('Password: admin123');
-
-  } catch (error) {
-    console.error('Error seeding admin user:', error);
-  } finally {
-    await mongoose.disconnect();
-    process.exit(0);
-  }
+        // Create admin user
+        const user = await User.create(adminUser);
+        console.log('Admin user created successfully:', user);
+        process.exit();
+    } catch (error) {
+        console.error('Error seeding admin user:', error);
+        process.exit(1);
+    }
 };
 
 seedAdmin(); 

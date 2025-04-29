@@ -1,12 +1,14 @@
-const express = require('express');
-const { createGuide, getGuides, getGuide, updateGuide, deleteGuide, upload } = require('../controllers/guideController');
+import express from 'express';
+import { createGuide, getGuides, getGuideById, updateGuide, deleteGuide } from '../controllers/guideController.js';
+import { verifyToken, verifyAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/', upload.single('image'), createGuide);
+// Guide routes
+router.post('/', verifyAdmin, createGuide);
 router.get('/', getGuides);
-router.get('/:id', getGuide);
-router.put('/:id', upload.single('image'), updateGuide);
-router.delete('/:id', deleteGuide);
+router.get('/:id', getGuideById);
+router.put('/:id', verifyAdmin, updateGuide);
+router.delete('/:id', verifyAdmin, deleteGuide);
 
-module.exports = router;
+export default router;

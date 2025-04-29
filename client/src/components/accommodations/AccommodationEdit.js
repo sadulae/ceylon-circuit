@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Container, Paper, Typography, Avatar, Button, TextField, Grid, Alert, InputAdornment, Fade } from '@mui/material';
+import { Box, Container, Paper, Avatar, Button, TextField, Grid, Alert, InputAdornment, Fade } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateAccommodation } from '../../redux/slices/accSlice';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
 import SaveIcon from '@mui/icons-material/Save';
-import Swal from 'sweetalert2'; // Import SweetAlert2
+import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 
 const AccommodationEdit = () => {
-  const { user, loading } = useSelector((state) => state.auth);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [error, setError] = useState('');
@@ -41,12 +39,25 @@ const AccommodationEdit = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(
+      console.log('Updating accommodation:', accommodation._id);
+      console.log('With data:', formData);
+      
+      // Format data correctly according to the API expectations
+      const accommodationData = {
+        ...formData,
+        // Convert to numbers if needed
+        availableSingleRooms: formData.availableSingleRooms ? parseInt(formData.availableSingleRooms) : 0,
+        availableDoubleRooms: formData.availableDoubleRooms ? parseInt(formData.availableDoubleRooms) : 0,
+      };
+      
+      const result = await dispatch(
         updateAccommodation({
-          id: accommodation._id,  // Ensure you have this ID
-          updatedData: formData, // The updated accommodation data
+          id: accommodation._id,
+          accommodationData: accommodationData, // Send correctly named parameter
         })
       ).unwrap();
+
+      console.log('Update result:', result);
 
       setSuccess('Accommodation updated successfully');
       Swal.fire({
@@ -57,7 +68,19 @@ const AccommodationEdit = () => {
       });
       navigate(`/acc-updt`);
     } catch (err) {
-      setError(err.message || 'Failed to update accommodation');
+      console.error('Error updating accommodation:', err);
+      
+      // Show detailed error information
+      const errorMessage = err.message || 'Failed to update accommodation';
+      setError(errorMessage);
+      
+      // Show error alert
+      Swal.fire({
+        icon: 'error',
+        title: 'Error!',
+        text: errorMessage,
+        confirmButtonColor: '#f44336'
+      });
     }
   };
 

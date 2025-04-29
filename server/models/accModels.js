@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const accommodationSchema = new mongoose.Schema({
   accName: {
@@ -19,16 +19,15 @@ const accommodationSchema = new mongoose.Schema({
     trim: true
   },
   availableSingleRooms: {
-      type: Number,
-      default: 0,
-      min: [0, 'Room count cannot be negative']
-    },
-    availableDoubleRooms: {
-      type: Number,
-      default: 0,
-      min: [0, 'Room count cannot be negative']
-    }
-  ,
+    type: Number,
+    default: 0,
+    min: [0, 'Room count cannot be negative']
+  },
+  availableDoubleRooms: {
+    type: Number,
+    default: 0,
+    min: [0, 'Room count cannot be negative']
+  },
   availableRooms: {
     type: Number,
     default: 0,
@@ -49,4 +48,4 @@ const accommodationSchema = new mongoose.Schema({
 
 const Accommodation = mongoose.model('Accommodation', accommodationSchema);
 
-module.exports = Accommodation;
+export default Accommodation;

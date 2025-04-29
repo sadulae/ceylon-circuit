@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-// import { toast } from "react-toastify";
-// import "react-toastify/dist/ReactToastify.css";
 import Swal from "sweetalert2";
-
 import {
   Box,
   Container,
@@ -13,7 +10,6 @@ import {
   Alert,
   CircularProgress,
   InputAdornment,
-  IconButton,
   Grid,
   MenuItem,
   Select,
@@ -24,7 +20,7 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { addAccommodation } from '../../redux/slices/accSlice';
+import { createAccommodation } from '../../redux/slices/accSlice';
 import BadgeIcon from '@mui/icons-material/Badge';
 
 const districts = [
@@ -71,38 +67,79 @@ const Accommodation = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { accName, location, address, availableSingleRooms, availableDoubleRooms, facilities } = formData;
-    const availableRooms = Number(availableSingleRooms) + Number(availableDoubleRooms);
-
-    if (!accName || !location || !address || !availableSingleRooms || !availableDoubleRooms || facilities.length === 0) {
-      setError('All fields are required');
+    
+    // Form validation
+    if (!accName || !location || !address) {
+      setError('Accommodation name, location, and address are required');
+      return;
+    }
+    
+    if (!availableSingleRooms && !availableDoubleRooms) {
+      setError('You must specify at least one room type');
       return;
     }
 
+    // Convert to numbers and compute total
+    const singleRooms = Number(availableSingleRooms) || 0;
+    const doubleRooms = Number(availableDoubleRooms) || 0;
+    const totalRooms = singleRooms + doubleRooms;
+    
     try {
-      const res = await dispatch(addAccommodation({ accName, location, address, availableSingleRooms, availableDoubleRooms, availableRooms, facilities })).unwrap();
-      console.log("res",res)
+      console.log('Submitting accommodation data:', {
+        accName, 
+        location, 
+        address, 
+        availableSingleRooms: singleRooms, 
+        availableDoubleRooms: doubleRooms, 
+        availableRooms: totalRooms,
+        facilities
+      });
+      
+      const res = await dispatch(createAccommodation({
+        accName, 
+        location, 
+        address, 
+        availableSingleRooms: singleRooms, 
+        availableDoubleRooms: doubleRooms, 
+        availableRooms: totalRooms,
+        facilities
+      })).unwrap();
+      
+      console.log("Response from createAccommodation:", res);
+      
       Swal.fire({
         icon: "success",
         title: "Success!",
         text: "Accommodation added successfully!",
         confirmButtonColor: "#3085d6",
       });
-      // navigate('/login');
+      
+      // Reset form
+      setFormData({
+        accName: '',
+        location: '',
+        address: '',
+        availableSingleRooms: '',
+        availableDoubleRooms: '',
+        facilities: []
+      });
+      
     } catch (err) {
-      console.log("err",err)
-      if (err.status === 400) {
+      console.error("Error in createAccommodation:", err);
+      
+      if (err && err.includes("already exists")) {
         Swal.fire({
           icon: "error",
           title: "Duplicate Entry",
-          text: "Accommodation already exists!",
+          text: "Accommodation already exists with this name!",
           confirmButtonColor: "#d33",
         });
       } else {
-        // setError(err.message || "Registration failed. Please try again.");
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: err.message || "Registration failed. Please try again.",
+          text: err || "Failed to add accommodation. Please try again.",
+          confirmButtonColor: "#d33",
         });
       }
     }
