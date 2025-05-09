@@ -13,8 +13,8 @@ const destinationSchema = new Schema(
       type: String,
       required: [true, 'A destination must have a category'],
       enum: {
-        values: ['Beach', 'Mountain', 'Cultural', 'Wildlife', 'Historical', 'Waterfall', 'Adventure'],
-        message: 'Category must be one of: Beach, Mountain, Cultural, Wildlife, Historical, Waterfall, Adventure',
+        values: ['Beach', 'Mountain', 'Cultural', 'Wildlife', 'Historical', 'Waterfall', 'Adventure', 'Religious'],
+        message: 'Category must be one of: Beach, Mountain, Cultural, Wildlife, Historical, Waterfall, Adventure, Religious',
       },
     },
     summary: {
@@ -68,6 +68,10 @@ const destinationSchema = new Schema(
     },
     tags: [String],
     facilities: [String],
+    mainImage: {
+      type: String,
+      required: [true, 'A destination must have a main image'],
+    },
     images: [String],
     visitorTips: [String],
     bestTimeToVisit: {

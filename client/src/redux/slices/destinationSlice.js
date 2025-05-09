@@ -28,12 +28,63 @@ export const fetchDestinations = createAsyncThunk(
       console.log('Destinations response:', response);
       
       // Check if the data is an object with a 'data' property (nested structure)
-      if (response.data && response.data.data) {
-        return response.data.data;
+      let destinations = response.data && response.data.data 
+        ? response.data.data 
+        : response.data;
+      
+      // Parse string fields if needed
+      if (Array.isArray(destinations)) {
+        destinations = destinations.map(dest => {
+          const destination = {...dest};
+          
+          // Parse bestTimeToVisit if it's a string
+          if (destination.bestTimeToVisit && typeof destination.bestTimeToVisit === 'string') {
+            try {
+              destination.bestTimeToVisit = JSON.parse(destination.bestTimeToVisit);
+            } catch (err) {
+              console.error(`Error parsing bestTimeToVisit for ${destination.name}:`, err);
+              destination.bestTimeToVisit = {
+                season: 'Year Round',
+                months: [],
+                notes: ''
+              };
+            }
+          }
+          
+          // Parse entryFee if it's a string
+          if (destination.entryFee && typeof destination.entryFee === 'string') {
+            try {
+              destination.entryFee = JSON.parse(destination.entryFee);
+            } catch (err) {
+              console.error(`Error parsing entryFee for ${destination.name}:`, err);
+              destination.entryFee = {
+                local: 0,
+                foreign: 0,
+                notes: ''
+              };
+            }
+          }
+          
+          // Parse openingHours if it's a string
+          if (destination.openingHours && typeof destination.openingHours === 'string') {
+            try {
+              destination.openingHours = JSON.parse(destination.openingHours);
+            } catch (err) {
+              console.error(`Error parsing openingHours for ${destination.name}:`, err);
+              destination.openingHours = {
+                open: '',
+                close: '',
+                daysClosed: [],
+                notes: ''
+              };
+            }
+          }
+          
+          return destination;
+        });
       }
       
-      // Return the data directly if it's not nested
-      return response.data;
+      return destinations;
     } catch (error) {
       console.error('Error fetching destinations:', error);
       return rejectWithValue(
@@ -55,6 +106,47 @@ export const fetchDestination = createAsyncThunk(
       
       // Get the destination data - either from nested structure or directly
       let destinationData = response.data && response.data.data ? response.data.data : response.data;
+      
+      // Parse string fields if they're still in string format
+      if (destinationData.bestTimeToVisit && typeof destinationData.bestTimeToVisit === 'string') {
+        try {
+          destinationData.bestTimeToVisit = JSON.parse(destinationData.bestTimeToVisit);
+        } catch (err) {
+          console.error('Error parsing bestTimeToVisit string:', err);
+          destinationData.bestTimeToVisit = {
+            season: 'Year Round',
+            months: [],
+            notes: ''
+          };
+        }
+      }
+      
+      if (destinationData.entryFee && typeof destinationData.entryFee === 'string') {
+        try {
+          destinationData.entryFee = JSON.parse(destinationData.entryFee);
+        } catch (err) {
+          console.error('Error parsing entryFee string:', err);
+          destinationData.entryFee = {
+            local: 0,
+            foreign: 0,
+            notes: ''
+          };
+        }
+      }
+      
+      if (destinationData.openingHours && typeof destinationData.openingHours === 'string') {
+        try {
+          destinationData.openingHours = JSON.parse(destinationData.openingHours);
+        } catch (err) {
+          console.error('Error parsing openingHours string:', err);
+          destinationData.openingHours = {
+            open: '',
+            close: '',
+            daysClosed: [],
+            notes: ''
+          };
+        }
+      }
       
       // Normalize the data structure to ensure all required properties exist
       const normalizedData = {

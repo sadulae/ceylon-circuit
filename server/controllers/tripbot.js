@@ -3,14 +3,23 @@ import Destination from '../models/Destination.js';
 import Accommodation from '../models/accModels.js';
 import TourGuide from '../models/tourGuide.js';
 import Tour from '../models/tourModel.js';
-import GeminiService from '../services/geminiService.js';
+import GptService from '../services/gptService.js';
+import { TripMemory, createMemory, getMemory, updateMemory } from '../services/tripMemoryService.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
+import OpenAI from 'openai';
+import dotenv from 'dotenv';
 
-// Memory store for conversation context
-const conversationMemory = new Map();
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 // Helper function to generate a unique session ID
 const generateSessionId = () => Math.random().toString(36).substring(2, 15);
@@ -20,7 +29,7 @@ const generateSessionId = () => Math.random().toString(36).substring(2, 15);
 // @access  Public
 export const chatHandler = async (req, res) => {
   try {
-    const { message, sessionId: existingSessionId } = req.body;
+    const { message, context = [], sessionId } = req.body;
     
     if (!message) {
       return res.status(400).json({ 
@@ -28,387 +37,249 @@ export const chatHandler = async (req, res) => {
         message: 'No message provided'
       });
     }
-    
-    // Create or retrieve session context
-    const sessionId = existingSessionId || generateSessionId();
-    if (!conversationMemory.has(sessionId)) {
-      conversationMemory.set(sessionId, {
-        history: [],
-        preferences: {
-          interests: [],
-          budget: null,
-          duration: null,
-          travelers: null,
-          destinations: [],
-          travelDates: null
-        },
-        stage: 'greeting',
-        lastUpdated: Date.now()
-      });
-    }
-    
-    const context = conversationMemory.get(sessionId);
-    context.history.push({ role: 'user', content: message });
-    context.lastUpdated = Date.now();
-    
-    // Determine if enough information has been collected to generate a plan
-    const hasEnoughInfo = () => {
-      const { destinations, interests, duration } = context.preferences;
-      return (destinations.length > 0 || interests.length > 0) && duration;
-    };
-    
-    // Use Gemini to analyze the message for travel planning information
-    const extractedInfo = await GeminiService.analyzeUserMessage(message);
-    
-    if (extractedInfo) {
-      // Update context with extracted information
-      if (extractedInfo.destinations && extractedInfo.destinations.length > 0) {
-        context.preferences.destinations = [
-          ...new Set([...context.preferences.destinations, ...extractedInfo.destinations])
-        ];
-      }
-      
-      if (extractedInfo.duration) {
-        context.preferences.duration = extractedInfo.duration;
-      }
-      
-      if (extractedInfo.interests && extractedInfo.interests.length > 0) {
-        context.preferences.interests = [
-          ...new Set([...context.preferences.interests, ...extractedInfo.interests])
-        ];
-      }
-      
-      if (extractedInfo.budget) {
-        context.preferences.budget = extractedInfo.budget;
-      }
-      
-      if (extractedInfo.travelers) {
-        context.preferences.travelers = extractedInfo.travelers;
-      }
-    }
-    
-    // Check if user is asking about destinations
-    const isAskingAboutDestinations = 
-      message.toLowerCase().includes('destination') ||
-      message.toLowerCase().includes('place') ||
-      message.toLowerCase().includes('location') ||
-      message.toLowerCase().includes('where') ||
-      message.toLowerCase().includes('visit') ||
-      message.toLowerCase().includes('offer') ||
-      message.toLowerCase().includes('available') ||
-      message.toLowerCase().includes('other');
 
-    // Check if this is a follow-up question about destinations
-    const isFollowUpDestinationQuestion = 
-      context.history.length >= 3 && // Has at least one previous exchange
-      context.history[context.history.length - 3].role === 'assistant' && // Last bot message
-      context.history[context.history.length - 3].content.includes('destinations in Sri Lanka from our database'); // Was about destinations
-      
-    if (isAskingAboutDestinations) {
-      try {
-        // First count total destinations to know what we're working with
-        const totalDestinationCount = await Destination.countDocuments();
-        
-        // Handle case with no destinations
-        if (totalDestinationCount === 0) {
-          const noDestinationsText = "I apologize, but we don't have any destinations in our database yet. We're working on adding more destinations soon. In the meantime, I can still help you plan a trip to popular places in Sri Lanka based on your interests.";
-          
-          context.history.push({ role: 'assistant', content: noDestinationsText });
-          
-          return res.status(200).json({
-            sessionId,
-            type: 'text',
-            content: noDestinationsText
-          });
-        }
-        
-        // Handle follow-up question when there's only one destination
-        if (isFollowUpDestinationQuestion && totalDestinationCount === 1) {
-          const onlyOneDestinationText = "Currently, Sigiriya is the only destination in our database. We're working on expanding our offerings to include more destinations across Sri Lanka. Would you like more detailed information about Sigiriya, or shall I help you plan a trip there?";
-          
-          context.history.push({ role: 'assistant', content: onlyOneDestinationText });
-          
-          return res.status(200).json({
-            sessionId,
-            type: 'text',
-            content: onlyOneDestinationText
-          });
-        }
-        
-        // Handle follow-up question when there are very few destinations (less than 5)
-        if (isFollowUpDestinationQuestion && totalDestinationCount < 5) {
-          const fewDestinationsText = `Currently, we only have ${totalDestinationCount} destinations in our database. We're working on expanding our offerings to include more destinations across Sri Lanka. Would you like me to help you plan a trip to one of these places?`;
-          
-          context.history.push({ role: 'assistant', content: fewDestinationsText });
-          
-          return res.status(200).json({
-            sessionId,
-            type: 'text',
-            content: fewDestinationsText
-          });
-        }
-        
-        // Determine if we should offset results for variety in follow-up questions
-        let offset = 0;
-        let limit = 15;
-        
-        if (isFollowUpDestinationQuestion) {
-          // If we have more than 15 destinations, we can offset
-          if (totalDestinationCount > 15) {
-            offset = 15; // Skip the first 15 results for variety
-            limit = 10;  // Show fewer results in follow-up
-          } else {
-            // If we have 15 or fewer, just show them all again with a different message
-            offset = 0;
-            limit = totalDestinationCount;
-          }
-        } else {
-          // For first question, limit to either 15 or all available if less
-          limit = Math.min(15, totalDestinationCount);
-        }
+    console.log('Processing chat message:', message);
 
-        // Fetch real destinations from database with pagination
-        const destinations = await Destination.find({})
-          .select('name category location.province location.district summary')
-          .skip(offset)
-          .limit(limit);
-          
-        if (destinations && destinations.length > 0) {
-          // Group destinations by category
-          const destinationsByCategory = {};
-          
-          destinations.forEach(dest => {
-            if (!destinationsByCategory[dest.category]) {
-              destinationsByCategory[dest.category] = [];
-            }
-            destinationsByCategory[dest.category].push({
-              name: dest.name,
-              location: `${dest.location.district}, ${dest.location.province}`,
-              summary: dest.summary || ''
-            });
-          });
-          
-          // Create a formatted list of destinations
-          let destinationText = "";
-          
-          if (isFollowUpDestinationQuestion) {
-            if (offset === 0) {
-              // If we're showing the same destinations again
-              destinationText = `These are all the destinations we currently have in our database (${totalDestinationCount} in total):\n\n`;
-            } else {
-              // If we're showing additional destinations
-              destinationText = "Here are some additional destinations from our database:\n\n";
-            }
-          } else {
-            destinationText = "Here are some popular destinations in Sri Lanka from our database:\n\n";
-          }
-          
-          for (const category in destinationsByCategory) {
-            destinationText += `**${category}**:\n`;
-            destinationsByCategory[category].forEach(dest => {
-              destinationText += `* **${dest.name}** (${dest.location}): ${dest.summary.substring(0, 100)}${dest.summary.length > 100 ? '...' : ''}\n`;
-            });
-            destinationText += '\n';
-          }
-          
-          // Add different follow-up prompts based on context
-          if (isFollowUpDestinationQuestion) {
-            // If we have shown all destinations
-            if (totalDestinationCount <= 15 || (offset + destinations.length >= totalDestinationCount)) {
-              destinationText += "That's all the destinations we have available right now. We're constantly adding more! Would you like me to help you plan a trip to any of these places?";
-            } else {
-              destinationText += "Is there a specific type of destination you're interested in, like beaches, wildlife, or cultural sites? I can provide more focused recommendations.";
-            }
-          } else {
-            destinationText += "Would you like more information about any of these destinations? Or would you like me to help you plan a trip to visit some of them?";
-          }
-          
-          // Store the response in conversation history
-          context.history.push({ role: 'assistant', content: destinationText });
-          
-          // Return the data-driven response
-          return res.status(200).json({
-            sessionId,
-            type: 'text',
-            content: destinationText
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching destinations:', error);
-        // Continue with regular AI response if destination fetching fails
-      }
-    }
-    
-    // Check if user is asking for a trip plan or itinerary
-    const isAskingForPlan = 
-      message.toLowerCase().includes('plan') ||
-      message.toLowerCase().includes('itinerary') ||
-      message.toLowerCase().includes('schedule') ||
-      message.toLowerCase().includes('day by day');
-      
-    if (isAskingForPlan && hasEnoughInfo()) {
-      try {
-        context.stage = 'trip_planning';
-        const planResponse = await generateAITripPlan(context);
-        
-        // Add a specialized message with button for generating PDF
-        const responseWithPdfOption = {
-          ...planResponse,
-          type: 'trip_plan_with_actions',
-          actions: [
-            { 
-              type: 'generate_pdf', 
-              label: 'Download as PDF', 
-              planId: planResponse.content?.id || null 
-            },
-            { 
-              type: 'save_plan', 
-              label: 'Save This Plan', 
-              planId: planResponse.content?.id || null 
-            }
-          ]
-        };
-        
-        // Save response to conversation history
-        context.history.push({ role: 'assistant', content: responseWithPdfOption });
-        
-        // Return response with session ID
-        return res.status(200).json({
-          sessionId,
-          ...responseWithPdfOption
-        });
-      } catch (error) {
-        console.error('Error generating AI trip plan:', error);
-        // Fall back to regular chat response if trip plan generation fails
-      }
-    }
-
-    // Check if user is asking about specific destination details
-    const destinationNames = await getDestinationNames();
-    const mentionedDestination = findMentionedDestination(message, destinationNames);
-    
-    if (mentionedDestination) {
-      try {
-        // Fetch specific destination details
-        const destination = await Destination.findOne({ 
-          name: { $regex: new RegExp(`^${mentionedDestination}$`, 'i') } 
-        });
-        
-        if (destination) {
-          // Create a rich response with destination card
-          const destinationCard = {
-            type: 'destination_card',
-            content: {
-              id: destination._id,
-              name: destination.name,
-              category: destination.category,
-              location: destination.location,
-              summary: destination.summary,
-              description: destination.description,
-              images: destination.images || [],
-              facilities: destination.facilities || []
-            },
-            message: `Here's information about ${destination.name}. Would you like to include this in your trip plan?`
-          };
-          
-          // Add suggestion buttons
-          destinationCard.actions = [
-            { 
-              type: 'add_to_plan', 
-              label: 'Add to My Plan', 
-              destinationId: destination._id 
-            },
-            { 
-              type: 'show_nearby', 
-              label: 'Show Nearby Attractions', 
-              location: destination.location 
-            }
-          ];
-          
-          // Store response in conversation history
-          context.history.push({ role: 'assistant', content: destinationCard });
-          
-          // Return the rich destination response
-          return res.status(200).json({
-            sessionId,
-            ...destinationCard
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching specific destination:', error);
-        // Fall back to regular response if destination fetch fails
-      }
-    }
-    
-    // Generate a regular chat response
     try {
-      const aiResponse = await GeminiService.generateChatResponse(context.history, { preferences: context.preferences });
+      // Generate AI response using GPT
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a friendly Sri Lankan travel assistant for Ceylon Circuit. Guide the conversation to collect:
+1. If they're a first-time visitor
+2. Trip duration (3, 5, 7, or 10 days)
+3. Interests (culture, nature, beaches, etc.)
+4. Budget level
+5. Preferred pace (relaxed vs active)
+
+Once you have all necessary information, suggest creating a trip plan.
+
+Please format your response with:
+1. A friendly message to the user
+2. 2-3 suggestions for the next response as bullet points starting with "- "
+
+For first-time messages or greetings, respond with a welcome message like:
+"Welcome to Ceylon Circuit! 🌴 Before we start planning your perfect Sri Lankan adventure, I'd love to know - have you visited our beautiful island before? This will help me tailor the perfect experience for you."
+
+And include these suggestions:
+- No, first time
+- Yes, I have visited before`
+          },
+          ...context.map(msg => ({
+            role: msg.type === 'user' ? 'user' : 'assistant',
+            content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
+          })),
+          {
+            role: 'user',
+            content: message
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      });
+
+      const aiResponseText = completion.choices[0].message.content;
       
-      // Create response object
-      let response = {
-        type: 'text',
-        content: aiResponse
+      // Extract suggestions (lines that start with "- ")
+      const suggestions = aiResponseText
+        .split('\n')
+        .filter(line => line.trim().startsWith('- '))
+        .map(line => line.trim().replace('- ', ''));
+      
+      // Remove suggestion lines from content
+      const content = aiResponseText
+        .split('\n')
+        .filter(line => !line.trim().startsWith('- '))
+        .join('\n')
+        .trim();
+      
+      const aiResponse = {
+        content,
+        suggestions: suggestions.length > 0 ? suggestions : []
       };
       
-      // Update context
-      context.history.push({ role: 'assistant', content: response.content });
-      
-      // Return response with session ID
-      res.status(200).json({
-        sessionId,
-        ...response
+      console.log('AI response generated successfully');
+
+      return res.json({
+        success: true,
+        response: aiResponse
       });
+
     } catch (error) {
-      console.error('Error generating chat response:', error);
-      res.status(500).json({ 
+      console.error('Error generating AI response:', error);
+      
+      // Handle specific OpenAI API errors
+      if (error.response?.status === 429) {
+        return res.status(429).json({
+          success: false,
+          message: 'Rate limit exceeded. Please try again in a moment.'
+        });
+      }
+      
+      if (error.response?.status === 401) {
+        return res.status(500).json({
+          success: false,
+          message: 'Authentication error with AI service'
+        });
+      }
+
+      // Generic error response
+      return res.status(500).json({
         success: false,
-        message: 'Error processing your message',
-        error: error.message
+        message: "I apologize, but I'm having trouble processing your request right now. Could you please try again in a moment? 🙏"
       });
     }
-    
-  } catch (err) {
-    console.error('Error processing chat message:', err);
-    res.status(500).json({ 
+
+  } catch (error) {
+    console.error('Chat handler error:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Error processing your message',
-      error: err.message
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
-// Helper function to generate trip plan using Gemini AI
-const generateAITripPlan = async (context) => {
+// Helper function to get system prompt based on memory state
+function getSystemPrompt(memory) {
+  return `You are TripBot, an AI travel assistant for Ceylon Circuit, specializing in Sri Lankan travel planning.
+Current stage: ${memory.stage}
+User status: ${memory.isReturningTraveler ? 'Returning visitor' : 'First-time visitor'}
+${memory.duration ? `Trip duration: ${memory.duration} days` : ''}
+${memory.currentDay ? `Current day: ${memory.currentDay}` : ''}
+${memory.dayPlans.size > 0 ? `Selected destinations: ${[...memory.dayPlans.values()].flatMap(p => p.destinations).join(', ')}` : ''}
+
+Please help the user plan their perfect Sri Lankan vacation. Be friendly, professional, and use emojis occasionally.`;
+}
+
+// Helper function to get available destinations
+async function getAvailableDestinations(excludePlaces = []) {
   try {
-    // Fetch data from database
-    const destinations = await Destination.find({}).limit(20);
-    const accommodations = await Accommodation.find({}).limit(20);
-    const tourGuides = await TourGuide.find({}).limit(10);
-    const tourPackages = await Tour.find({}).limit(10);
+    const query = excludePlaces.length ? 
+      { name: { $nin: excludePlaces } } : 
+      {};
+      
+    return await Destination.find(query)
+      .select('name category location.province location.district summary images mainImage')
+      .limit(6);
+      } catch (error) {
+        console.error('Error fetching destinations:', error);
+    return [];
+      }
+    }
     
-    // Generate trip plan with AI
-    const aiPlan = await GeminiService.generateTripPlanWithAI(
-      context, 
-      destinations, 
-      accommodations, 
-      tourGuides, 
-      tourPackages
-    );
+// Helper function to get nearby accommodations
+async function getNearbyAccommodations(destinationName) {
+      try {
+    const destination = await Destination.findOne({ name: destinationName });
+    if (!destination) return [];
     
-    // Store the plan in context
-    context.lastPlan = aiPlan;
-    context.stage = 'refinement';
+    return await Accommodation.find({
+      'location.district': destination.location.district
+    })
+    .select('name type location price amenities image')
+    .limit(5);
+  } catch (error) {
+    console.error('Error fetching accommodations:', error);
+    return [];
+  }
+}
+
+// Helper function to extract places from message
+async function extractPlacesFromMessage(message) {
+  try {
+    const destinations = await Destination.find({});
+    const places = [];
     
-    // Format the response
+    destinations.forEach(dest => {
+      if (message.toLowerCase().includes(dest.name.toLowerCase())) {
+        places.push(dest.name);
+      }
+    });
+    
+    return places;
+      } catch (error) {
+    console.error('Error extracting places:', error);
+    return [];
+      }
+    }
+
+// Helper function to extract destinations from message
+async function extractDestinationsFromMessage(message) {
+      try {
+    const destinations = await Destination.find({});
+    const selected = [];
+    
+    destinations.forEach(dest => {
+      if (message.toLowerCase().includes(dest.name.toLowerCase())) {
+        selected.push(dest.name);
+      }
+    });
+    
+    return selected;
+      } catch (error) {
+    console.error('Error extracting destinations:', error);
+    return [];
+  }
+}
+
+// Helper function to extract accommodation from message
+async function extractAccommodationFromMessage(message) {
+    try {
+    const accommodations = await Accommodation.find({});
+    let selected = null;
+    
+    accommodations.forEach(acc => {
+      if (message.toLowerCase().includes(acc.name.toLowerCase())) {
+        selected = acc.name;
+      }
+    });
+    
+    return selected;
+    } catch (error) {
+    console.error('Error extracting accommodation:', error);
+    return null;
+  }
+}
+
+// Helper function to generate trip plan response
+async function generateTripPlanResponse(memory) {
+  try {
+    const plan = await GptService.generateTripPlanWithAI(memory);
+    
+    // Create a new trip plan in the database
+    const newTripPlan = new TripPlan({
+      title: `${memory.duration}-Day Sri Lanka Trip`,
+      destinations: [...new Set([...memory.dayPlans.values()].flatMap(day => day.destinations))],
+      duration: memory.duration,
+      itinerary: plan.itinerary,
+      estimatedCost: plan.estimatedCost,
+      importantNotes: plan.importantNotes,
+      emergencyContacts: plan.emergencyContacts,
+      packingList: plan.packingList
+    });
+
+    await newTripPlan.save();
+
     return {
       type: 'trip_plan',
-      content: aiPlan
+      content: {
+        ...plan,
+        id: newTripPlan._id,
+        message: "Here's your complete trip plan! Would you like me to generate a detailed PDF report?",
+        actions: [
+          { type: 'generate_pdf', label: 'Generate PDF' },
+          { type: 'modify_plan', label: 'Modify Plan' }
+        ]
+      }
     };
   } catch (error) {
-    console.error('Error generating AI trip plan:', error);
-    throw new Error('Could not generate trip plan');
+    console.error('Error generating trip plan:', error);
+    throw error;
   }
-};
+}
 
 // @desc    Save a trip plan
 // @route   POST /api/tripbot/save-plan
@@ -434,11 +305,11 @@ export const saveTripPlan = async (req, res) => {
     const newTripPlan = new TripPlan({
       user: req.user?._id,
       title: plan.title || `Sri Lanka Trip (${plan.itinerary?.length || 'Multi'} Days)`,
-      destinations: context?.preferences.destinations || [],
+      destinations: context?.memory.dayPlans.get(1)?.destinations || [],
       startDate: plan.startDate || null,
       endDate: plan.endDate || null,
-      travelers: plan.travelers || (context?.preferences.travelers || 1),
-      itinerary: plan.itinerary || context?.lastPlan?.itinerary || [],
+      travelers: plan.travelers || (context?.memory.travelers || 1),
+      itinerary: plan.itinerary || context?.memory.dayPlans.get(1)?.destinations || [],
       notes: plan.notes || '',
       status: 'draft'
     });
@@ -513,107 +384,230 @@ export const getRecommendations = async (req, res) => {
 
 // @desc    Generate a trip plan based on preferences
 // @route   POST /api/tripbot/generate-plan
-// @access  Private
+// @access  Public
 export const generateTripPlan = async (req, res) => {
   try {
-    const {
-      startDate,
-      endDate,
-      interests,
-      budget,
-      transportation,
-      specialRequirements
-    } = req.body;
-
-    // Calculate trip duration
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const duration = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-
-    // Mock data for demonstration - replace with actual destination matching logic
-    const destinations = {
-      cultural: ['Kandy', 'Anuradhapura', 'Polonnaruwa', 'Dambulla'],
-      beaches: ['Mirissa', 'Unawatuna', 'Trincomalee', 'Pasikuda'],
-      wildlife: ['Yala', 'Udawalawe', 'Minneriya', 'Wilpattu'],
-      nature: ['Ella', 'Nuwara Eliya', 'Horton Plains', 'Sinharaja'],
-      adventure: ['Kitulgala', 'Knuckles Mountain', 'Pidurangala', 'Riverston']
-    };
-
-    // Generate itinerary based on interests
-    const itinerary = [];
-    let currentDate = new Date(startDate);
-
-    for (let day = 0; day < duration; day++) {
-      const dayPlan = {
-        date: new Date(currentDate),
-        location: '',
-        activities: []
-      };
-
-      // Select destination based on interests
-      const selectedInterest = interests[day % interests.length];
-      const destinationType = Object.keys(destinations).find(type => 
-        selectedInterest.toLowerCase().includes(type.toLowerCase())
-      );
-      
-      if (destinationType) {
-        const destinationList = destinations[destinationType];
-        dayPlan.location = destinationList[day % destinationList.length];
-
-        // Add activities for the day
-        dayPlan.activities = [
-          {
-            time: '09:00',
-            title: `Explore ${dayPlan.location}`,
-            description: `Discover the beauty of ${dayPlan.location}`,
-            duration: '3 hours'
-          },
-          {
-            time: '13:00',
-            title: 'Local Cuisine Experience',
-            description: 'Enjoy authentic Sri Lankan cuisine',
-            duration: '1.5 hours'
-          },
-          {
-            time: '15:00',
-            title: 'Cultural Activity',
-            description: 'Immerse in local culture and traditions',
-            duration: '2 hours'
-          }
-        ];
-      }
-
-      itinerary.push(dayPlan);
-      currentDate.setDate(currentDate.getDate() + 1);
+    const { sessionId, preferences } = req.body;
+    
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID is required'
+      });
     }
+    
+    // Get memory for this session
+    const memory = getMemory(sessionId);
+    if (!memory) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found. Please start a new conversation.'
+      });
+    }
+    
+    // Get data from the memory or preferences
+    const duration = preferences?.duration || memory.duration || 7;
+    const interests = preferences?.interests || memory.interests || [];
+    const budget = preferences?.budget || memory.budget || 'moderate';
+    const pace = preferences?.pace || memory.pace || 'moderate';
+    
+    // Fetch destinations from the database
+    const destinations = await Destination.find({})
+      .select('name category location summary description mainImage images visitDuration bestTimeToVisit');
+    
+    // Fetch accommodations from the database
+    const accommodations = await Accommodation.find({})
+      .select('name type location price amenities image');
+    
+    // Create system prompt for GPT
+    const systemPrompt = `You are a Sri Lankan travel expert. Create a detailed ${duration}-day travel plan
+based on the following preferences:
+- Interests: ${interests.join(', ') || 'General tourism'}
+- Budget: ${budget}
+- Pace: ${pace}
 
-    // Calculate estimated budget based on preferences
-    const budgetRates = {
-      budget: 50,
-      moderate: 100,
-      luxury: 200
-    };
-    const dailyRate = budgetRates[budget.toLowerCase()] || budgetRates.moderate;
-    const estimatedBudget = dailyRate * duration;
+Use ONLY destinations and accommodations from our database:
+Destinations: ${destinations.map(d => d.name).join(', ')}
+Accommodations: ${accommodations.map(a => a.name).join(', ')}
 
+Create a detailed day-by-day itinerary with:
+1. Day number and title summarizing the day's activities
+2. Locations to visit with brief descriptions
+3. Recommended accommodation for each night
+4. Travel times between locations
+5. Suggested activities, meal recommendations, and local tips
+6. Logical geographical progression between places to minimize travel time
+
+Return your response in this structure:
+TITLE: [Trip title]
+DURATION: [Number of days]
+SUMMARY: [Brief overview of the trip]
+
+ITINERARY:
+DAY 1: [Day title]
+- Destinations: [Destination 1], [Destination 2]
+- Accommodation: [Accommodation name]
+- Activities: [Activity 1], [Activity 2]
+- Meals: Breakfast at [location], Lunch at [location], Dinner at [location]
+- Travel Times: [Travel detail 1], [Travel detail 2]
+- Description: [Detailed description of the day]
+
+[Repeat for each day...]
+
+ESSENTIALS:
+- Packing: [Item 1], [Item 2]...
+- Tips: [Tip 1], [Tip 2]...
+- Cultural Notes: [Note 1], [Note 2]...
+- Estimated Cost: [Cost range for the entire trip]`;
+
+    // Generate a trip plan using GPT
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        {
+          role: 'user',
+          content: `Please create a ${duration}-day Sri Lanka trip plan based on these preferences: interests in ${interests.join(', ') || 'general tourism'}, ${budget} budget, and ${pace} pace.`
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000
+    });
+
+    // Parse the response text into structured data
+    const responseText = completion.choices[0].message.content;
+    
+    // Extract the title, duration, and summary
+    const titleMatch = responseText.match(/TITLE:\s*(.+)/);
+    const durationMatch = responseText.match(/DURATION:\s*(\d+)/);
+    const summaryMatch = responseText.match(/SUMMARY:\s*(.+?)(?=\n\n|\n[A-Z])/s);
+    
+    const title = titleMatch?.[1]?.trim() || `${duration}-Day Sri Lanka Adventure`;
+    const extractedDuration = durationMatch ? parseInt(durationMatch[1]) : duration;
+    const summary = summaryMatch?.[1]?.trim() || `A ${duration}-day exploration of Sri Lanka.`;
+    
+    // Extract the itinerary
+    const itinerarySection = responseText.match(/ITINERARY:(.+?)(?=ESSENTIALS:)/s)?.[1] || '';
+    const dayRegex = /DAY\s+(\d+):\s*([^\n]+)(?:\n|$)([\s\S]+?)(?=DAY\s+\d+:|$)/g;
+    
+    const itinerary = [];
+    let dayMatch;
+    while ((dayMatch = dayRegex.exec(itinerarySection)) !== null) {
+      const dayNum = parseInt(dayMatch[1]);
+      const dayTitle = dayMatch[2].trim();
+      const dayContent = dayMatch[3].trim();
+      
+      // Parse destinations
+      const destinationsMatch = dayContent.match(/Destinations:\s*(.+?)(?=\n|$)/);
+      const destinations = destinationsMatch 
+        ? destinationsMatch[1].split(',').map(d => d.trim()) 
+        : [];
+      
+      // Parse accommodation
+      const accommodationMatch = dayContent.match(/Accommodation:\s*(.+?)(?=\n|$)/);
+      const accommodation = accommodationMatch ? accommodationMatch[1].trim() : '';
+      
+      // Parse activities
+      const activitiesMatch = dayContent.match(/Activities:\s*(.+?)(?=\n|$)/);
+      const activities = activitiesMatch 
+        ? activitiesMatch[1].split(',').map(a => a.trim()) 
+        : [];
+      
+      // Parse meals
+      const mealsMatch = dayContent.match(/Meals:\s*(.+?)(?=\n|$)/);
+      let meals = {};
+      if (mealsMatch) {
+        const mealsText = mealsMatch[1];
+        const breakfastMatch = mealsText.match(/Breakfast[^,]+/);
+        const lunchMatch = mealsText.match(/Lunch[^,]+/);
+        const dinnerMatch = mealsText.match(/Dinner[^,]+/);
+        
+        if (breakfastMatch) meals.breakfast = breakfastMatch[0].replace('Breakfast at', '').replace('Breakfast:', '').trim();
+        if (lunchMatch) meals.lunch = lunchMatch[0].replace('Lunch at', '').replace('Lunch:', '').trim();
+        if (dinnerMatch) meals.dinner = dinnerMatch[0].replace('Dinner at', '').replace('Dinner:', '').trim();
+      }
+      
+      // Parse travel times
+      const travelTimesMatch = dayContent.match(/Travel Times:\s*(.+?)(?=\n|$)/);
+      const travelTimes = travelTimesMatch 
+        ? travelTimesMatch[1].split(',').map(t => t.trim()) 
+        : [];
+      
+      // Parse description
+      const descriptionMatch = dayContent.match(/Description:\s*(.+?)(?=\n|$)/s);
+      const description = descriptionMatch ? descriptionMatch[1].trim() : '';
+      
+      itinerary.push({
+        day: dayNum,
+        title: dayTitle,
+        destinations,
+        accommodation,
+        activities,
+        meals,
+        travelTimes,
+        description
+      });
+    }
+    
+    // Extract essentials
+    const essentialsSection = responseText.match(/ESSENTIALS:(.+)$/s)?.[1] || '';
+    
+    // Parse packing list
+    const packingMatch = essentialsSection.match(/Packing:\s*(.+?)(?=\n|$)/);
+    const packingList = packingMatch 
+      ? packingMatch[1].split(',').map(item => item.trim()) 
+      : [];
+    
+    // Parse travel tips
+    const tipsMatch = essentialsSection.match(/Tips:\s*(.+?)(?=\n|$)/);
+    const travelTips = tipsMatch 
+      ? tipsMatch[1].split(',').map(tip => tip.trim()) 
+      : [];
+    
+    // Parse cultural notes
+    const culturalMatch = essentialsSection.match(/Cultural Notes:\s*(.+?)(?=\n|$)/);
+    const culturalNotes = culturalMatch 
+      ? culturalMatch[1].split(',').map(note => note.trim()) 
+      : [];
+    
+    // Parse estimated cost
+    const costMatch = essentialsSection.match(/Estimated Cost:\s*(.+?)(?=\n|$)/);
+    const estimatedCost = costMatch ? costMatch[1].trim() : '';
+    
+    // Construct the structured trip plan
     const tripPlan = {
-      userId: req.user.id,
-      startDate,
-      endDate,
-      duration,
-      interests,
-      budget,
-      transportation,
-      specialRequirements,
+      title,
+      duration: extractedDuration,
+      summary,
       itinerary,
-      estimatedBudget,
-      totalDistance: Math.floor(Math.random() * 500) + 100 // Mock distance calculation
+      essentials: {
+        packingList,
+        travelTips,
+        culturalNotes,
+        estimatedCost
+      }
     };
 
-    res.status(200).json(tripPlan);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error generating trip plan' });
+    // Save the trip plan to the user's memory
+    memory.tripPlan = tripPlan;
+    updateMemory(sessionId, memory);
+
+    return res.json({
+      success: true,
+      message: 'Trip plan generated successfully',
+      tripPlan
+    });
+
+  } catch (error) {
+    console.error('Error generating trip plan:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Could not generate trip plan',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -714,145 +708,79 @@ function findMentionedDestination(message, destinationNames) {
 // @access  Private
 export const generatePlanPDF = async (req, res) => {
   try {
-    const planId = req.params.id;
+    const { plan } = req.body;
     
-    // Fetch the trip plan with populated destinations
-    const tripPlan = await TripPlan.findById(planId)
-      .populate({
-        path: 'itinerary.destinations',
-        model: 'Destination'
-      });
-    
-    if (!tripPlan) {
-      return res.status(404).json({
-        success: false,
-        message: 'Trip plan not found'
-      });
-    }
-    
-    // Create a temporary file path
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const tempFilePath = path.join(__dirname, '..', 'uploads', `trip-plan-${planId}.pdf`);
-    
-    // Create a PDF document
+    // Create a new PDF document
     const doc = new PDFDocument({
       size: 'A4',
-      margins: { top: 50, bottom: 50, left: 50, right: 50 }
+      margin: 50
     });
-    
-    // Pipe to a writable stream
-    const stream = fs.createWriteStream(tempFilePath);
-    doc.pipe(stream);
-    
-    // Add trip plan details to PDF
-    // Title and header
-    doc.fontSize(25).text(`Sri Lanka Trip Plan`, { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(15).text(`${tripPlan.title || 'Custom Trip Plan'}`, { align: 'center' });
-    doc.moveDown();
-    
-    // Trip details
-    doc.fontSize(12).text(`Duration: ${tripPlan.duration} days`);
-    doc.text(`Dates: ${new Date(tripPlan.startDate).toLocaleDateString()} to ${new Date(tripPlan.endDate).toLocaleDateString()}`);
-    doc.text(`Budget Level: ${tripPlan.budget}`);
-    doc.text(`Transportation: ${tripPlan.transportation}`);
-    doc.text(`Travelers: ${tripPlan.travelers}`);
-    doc.moveDown();
-    
-    // Interests
-    if (tripPlan.interests && tripPlan.interests.length > 0) {
-      doc.text(`Interests: ${tripPlan.interests.join(', ')}`);
-      doc.moveDown();
-    }
-    
-    // Itinerary - day by day
-    doc.fontSize(18).text('Daily Itinerary', { underline: true });
-    doc.moveDown();
-    
-    if (tripPlan.itinerary && tripPlan.itinerary.length > 0) {
-      tripPlan.itinerary.forEach((day, index) => {
-        // Day header
-        const dayDate = new Date(day.date);
-        doc.fontSize(14).text(`Day ${index + 1}: ${dayDate.toDateString()}`, { underline: true });
-        doc.moveDown(0.5);
-        
-        // Location
-        doc.fontSize(12).text(`Location: ${day.location}`);
-        doc.moveDown(0.5);
-        
-        // Activities
-        if (day.activities && day.activities.length > 0) {
-          doc.text('Activities:');
-          day.activities.forEach(activity => {
-            doc.fontSize(10).text(`• ${activity.time} - ${activity.title}: ${activity.description} (${activity.duration})`);
-          });
-        }
-        
-        // Accommodation
-        if (day.accommodation) {
-          doc.moveDown(0.5);
-          doc.fontSize(12).text(`Accommodation: ${day.accommodation.name || 'Not specified'}`);
-        }
-        
-        doc.moveDown();
+
+    // Pipe the PDF into a buffer
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      res.writeHead(200, {
+        'Content-Length': Buffer.byteLength(pdfData),
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment;filename=trip-plan.pdf',
       });
-    } else {
-      doc.text('No daily itinerary available.');
-    }
-    
-    // Notes
-    if (tripPlan.notes) {
-      doc.moveDown();
-      doc.fontSize(14).text('Notes:', { underline: true });
-      doc.fontSize(10).text(tripPlan.notes);
-    }
-    
-    // Add a footer with page numbers
-    const totalPages = doc.bufferedPageRange().count;
-    let currentPage = 0;
-    
-    doc.on('pageAdded', () => {
-      currentPage++;
-      const bottom = doc.page.height - doc.page.margins.bottom;
-      doc.fontSize(8)
-         .text(
-           `Page ${currentPage} of ${totalPages}`,
-           doc.page.margins.left,
-           bottom,
-           { align: 'center' }
-         );
+      res.end(pdfData);
     });
-    
-    // Contact information
-    doc.moveDown(2);
-    doc.fontSize(10).text('This trip plan was created by Ceylon Circuit TripBot.', { align: 'center' });
-    doc.fontSize(8).text('For more information, contact us at info@ceyloncircuit.com', { align: 'center' });
-    
+
+    // Add content to the PDF
+    doc.fontSize(24).text('Ceylon Circuit Travel Plan', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(18).text(plan.title, { align: 'center' });
+    doc.moveDown();
+
+    // Add each day's itinerary
+    plan.days.forEach((day, index) => {
+      doc.fontSize(16).text(`Day ${index + 1}: ${day.title}`);
+      doc.moveDown(0.5);
+      doc.fontSize(12).text(day.description);
+      
+      if (day.activities?.length) {
+        doc.moveDown(0.5);
+        doc.fontSize(14).text('Activities:');
+        day.activities.forEach(activity => {
+          doc.fontSize(12).text(`• ${activity}`);
+        });
+      }
+
+      if (day.meals?.length) {
+        doc.moveDown(0.5);
+        doc.fontSize(14).text('Meals:');
+        day.meals.forEach(meal => {
+          doc.fontSize(12).text(`• ${meal}`);
+        });
+      }
+
+      if (day.accommodation) {
+        doc.moveDown(0.5);
+        doc.fontSize(14).text('Accommodation:');
+        doc.fontSize(12).text(day.accommodation);
+      }
+
+      doc.moveDown();
+    });
+
+    // Add footer
+    doc.fontSize(10)
+      .text('Generated by Ceylon Circuit Travel Planner', {
+        align: 'center',
+        bottom: 30
+      });
+
     // Finalize the PDF
     doc.end();
-    
-    // Wait for the PDF to be created, then send it
-    stream.on('finish', () => {
-      res.download(tempFilePath, `Sri-Lanka-Trip-Plan-${tripPlan.title || planId}.pdf`, (err) => {
-        if (err) {
-          console.error('Error sending PDF:', err);
-        }
-        
-        // Clean up temp file
-        fs.unlink(tempFilePath, (unlinkErr) => {
-          if (unlinkErr) {
-            console.error('Error deleting temp file:', unlinkErr);
-          }
-        });
-      });
-    });
-    
-  } catch (err) {
-    console.error('Error generating PDF:', err);
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
     res.status(500).json({
       success: false,
-      message: 'Error generating PDF',
-      error: err.message
+      message: 'Failed to generate PDF'
     });
   }
 };

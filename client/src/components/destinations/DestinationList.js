@@ -15,6 +15,7 @@ import PlaceIcon from '@mui/icons-material/Place';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import Swal from 'sweetalert2';
 import { fetchDestinations, deleteDestination } from '../../redux/slices/destinationSlice';
+import { getImageUrl } from '../../utils/imageUtils';
 
 // Function to handle image errors
 const handleImageError = (e) => {
@@ -404,7 +405,7 @@ const DestinationList = ({ isAdmin = false }) => {
                     <CardMedia
                       component="img"
                       height="220"
-                      image={destination.mainImage || (destination.images && destination.images[0]) || 'https://via.placeholder.com/300x200?text=No+Image'}
+                      image={getImageUrl(destination.mainImage) || getImageUrl(destination.images && destination.images[0])}
                       alt={destination.name}
                       onError={handleImageError}
                       sx={{ objectFit: 'cover' }}

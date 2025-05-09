@@ -61,6 +61,9 @@ export const getDestinations = asyncHandler(async (req, res) => {
   // Execute query
   const destinations = await query;
   
+  // Parse JSON strings in each destination
+  const parsedDestinations = parseJsonFields(destinations);
+  
   // Calculate pagination info
   const totalPages = Math.ceil(total / parsedLimit);
   const hasNextPage = parsedPage < totalPages;
@@ -68,7 +71,7 @@ export const getDestinations = asyncHandler(async (req, res) => {
   
   res.status(200).json({
     success: true,
-    count: destinations.length,
+    count: parsedDestinations.length,
     pagination: {
       total,
       totalPages,
@@ -76,7 +79,7 @@ export const getDestinations = asyncHandler(async (req, res) => {
       hasNextPage,
       hasPrevPage
     },
-    data: destinations
+    data: parsedDestinations
   });
 });
 
@@ -90,9 +93,30 @@ export const getDestination = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse(`Destination not found with id of ${req.params.id}`, 404));
   }
   
+  // Parse string JSON fields if they exist
+  const destinationObj = destination.toObject();
+  
+  if (destinationObj.bestTimeToVisit && typeof destinationObj.bestTimeToVisit === 'string') {
+    try {
+      destinationObj.bestTimeToVisit = JSON.parse(destinationObj.bestTimeToVisit);
+    } catch (err) {
+      console.error('Error parsing bestTimeToVisit:', err);
+      // Keep as string if parsing fails
+    }
+  }
+  
+  if (destinationObj.entryFee && typeof destinationObj.entryFee === 'string') {
+    try {
+      destinationObj.entryFee = JSON.parse(destinationObj.entryFee);
+    } catch (err) {
+      console.error('Error parsing entryFee:', err);
+      // Keep as string if parsing fails
+    }
+  }
+  
   res.status(200).json({
     success: true,
-    data: destination
+    data: destinationObj
   });
 });
 
@@ -108,8 +132,8 @@ export const createDestination = asyncHandler(async (req, res, next) => {
     // Add user ID to request body
     req.body.createdBy = req.user.id;
     
-    // Parse JSON strings from FormData
-    const jsonFields = ['location', 'features', 'bestTimeToVisit', 'entryFee', 'openingHours', 'tips'];
+    // Parse JSON strings from FormData, but only for fields that accept objects in the schema
+    const jsonFields = ['location', 'features', 'tips'];
     
     for (const field of jsonFields) {
       if (req.body[field] && typeof req.body[field] === 'string') {
@@ -123,6 +147,19 @@ export const createDestination = asyncHandler(async (req, res, next) => {
       }
     }
     
+    // NOTE: bestTimeToVisit and entryFee should remain as strings
+    // as per the schema in models/Destination.js
+    
+    // If bestTimeToVisit is an object, stringify it
+    if (req.body.bestTimeToVisit && typeof req.body.bestTimeToVisit === 'object') {
+      req.body.bestTimeToVisit = JSON.stringify(req.body.bestTimeToVisit);
+    }
+    
+    // If entryFee is an object, stringify it
+    if (req.body.entryFee && typeof req.body.entryFee === 'object') {
+      req.body.entryFee = JSON.stringify(req.body.entryFee);
+    }
+    
     // Validate required fields from model
     if (!req.body.name) {
       return next(new ErrorResponse('A destination must have a name', 400));
@@ -134,6 +171,12 @@ export const createDestination = asyncHandler(async (req, res, next) => {
     
     if (!req.body.category) {
       return next(new ErrorResponse('A destination must have a category', 400));
+    }
+    
+    // Ensure category is one of the allowed values
+    const allowedCategories = ['Beach', 'Mountain', 'Cultural', 'Wildlife', 'Historical', 'Waterfall', 'Adventure', 'Religious'];
+    if (!allowedCategories.includes(req.body.category)) {
+      return next(new ErrorResponse(`Category must be one of: ${allowedCategories.join(', ')}`, 400));
     }
     
     if (!req.body.location || !req.body.location.address) {
@@ -292,8 +335,7 @@ export const updateDestination = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse(`Destination not found with id of ${req.params.id}`, 404));
   }
   
-  // Parse JSON strings from FormData 
-  // (Same parsing logic as create function - could be refactored to a helper function)
+  // Parse JSON strings from FormData - only for fields that accept objects
   if (req.body.location && typeof req.body.location === 'string') {
     try {
       req.body.location = JSON.parse(req.body.location);
@@ -314,39 +356,34 @@ export const updateDestination = asyncHandler(async (req, res, next) => {
     }
   }
   
-  if (req.body.bestTimeToVisit && typeof req.body.bestTimeToVisit === 'string') {
-    try {
-      req.body.bestTimeToVisit = JSON.parse(req.body.bestTimeToVisit);
-    } catch (err) {
-      console.error('Error parsing bestTimeToVisit:', err);
-      return next(new ErrorResponse('Invalid best time to visit data', 400));
-    }
+  // NOTE: bestTimeToVisit and entryFee should remain as strings per the schema
+  // Removing the parsing of these fields
+
+  // If bestTimeToVisit is sent as an object, stringify it
+  if (req.body.bestTimeToVisit && typeof req.body.bestTimeToVisit === 'object') {
+    req.body.bestTimeToVisit = JSON.stringify(req.body.bestTimeToVisit);
   }
   
-  if (req.body.entryFee && typeof req.body.entryFee === 'string') {
-    try {
-      req.body.entryFee = JSON.parse(req.body.entryFee);
-    } catch (err) {
-      console.error('Error parsing entryFee:', err);
-      return next(new ErrorResponse('Invalid entry fee data', 400));
-    }
+  // If entryFee is sent as an object, stringify it
+  if (req.body.entryFee && typeof req.body.entryFee === 'object') {
+    req.body.entryFee = JSON.stringify(req.body.entryFee);
   }
-  
-  if (req.body.openingHours && typeof req.body.openingHours === 'string') {
-    try {
-      req.body.openingHours = JSON.parse(req.body.openingHours);
-    } catch (err) {
-      console.error('Error parsing openingHours:', err);
-      return next(new ErrorResponse('Invalid opening hours data', 400));
-    }
-  }
-  
+
   if (req.body.tips && typeof req.body.tips === 'string') {
     try {
       req.body.tips = JSON.parse(req.body.tips);
+      console.log('Parsed tips:', req.body.tips);
     } catch (err) {
       console.error('Error parsing tips:', err);
       return next(new ErrorResponse('Invalid tips data', 400));
+    }
+  }
+  
+  // Check if category is valid if it's being updated
+  if (req.body.category) {
+    const allowedCategories = ['Beach', 'Mountain', 'Cultural', 'Wildlife', 'Historical', 'Waterfall', 'Adventure', 'Religious'];
+    if (!allowedCategories.includes(req.body.category)) {
+      return next(new ErrorResponse(`Category must be one of: ${allowedCategories.join(', ')}`, 400));
     }
   }
   
@@ -486,6 +523,33 @@ export const deleteDestination = asyncHandler(async (req, res, next) => {
   });
 });
 
+// Helper function to parse JSON string fields in destinations
+const parseJsonFields = (destinations) => {
+  return destinations.map(destination => {
+    const dest = destination.toObject();
+    
+    // Parse bestTimeToVisit if it's a string
+    if (dest.bestTimeToVisit && typeof dest.bestTimeToVisit === 'string') {
+      try {
+        dest.bestTimeToVisit = JSON.parse(dest.bestTimeToVisit);
+      } catch (err) {
+        // Keep as string if parsing fails
+      }
+    }
+    
+    // Parse entryFee if it's a string
+    if (dest.entryFee && typeof dest.entryFee === 'string') {
+      try {
+        dest.entryFee = JSON.parse(dest.entryFee);
+      } catch (err) {
+        // Keep as string if parsing fails
+      }
+    }
+    
+    return dest;
+  });
+};
+
 // @desc    Get destinations by category
 // @route   GET /api/destinations/category/:category
 // @access  Public
@@ -494,10 +558,12 @@ export const getDestinationsByCategory = asyncHandler(async (req, res) => {
     category: req.params.category 
   });
   
+  const parsedDestinations = parseJsonFields(destinations);
+  
   res.status(200).json({
     success: true,
-    count: destinations.length,
-    data: destinations
+    count: parsedDestinations.length,
+    data: parsedDestinations
   });
 });
 
@@ -509,10 +575,12 @@ export const getDestinationsByProvince = asyncHandler(async (req, res) => {
     'location.province': req.params.province 
   });
   
+  const parsedDestinations = parseJsonFields(destinations);
+  
   res.status(200).json({
     success: true,
-    count: destinations.length,
-    data: destinations
+    count: parsedDestinations.length,
+    data: parsedDestinations
   });
 });
 
@@ -524,10 +592,12 @@ export const getDestinationsByDistrict = asyncHandler(async (req, res) => {
     'location.district': req.params.district 
   });
   
+  const parsedDestinations = parseJsonFields(destinations);
+  
   res.status(200).json({
     success: true,
-    count: destinations.length,
-    data: destinations
+    count: parsedDestinations.length,
+    data: parsedDestinations
   });
 });
 
@@ -601,12 +671,14 @@ export const getTopRatedDestinations = async (req, res) => {
     const destinations = await Destination.find()
       .sort({ ratingsAverage: -1 })
       .limit(limit);
+    
+    const parsedDestinations = parseJsonFields(destinations);
 
     res.status(200).json({
       status: 'success',
-      results: destinations.length,
+      results: parsedDestinations.length,
       data: {
-        destinations
+        destinations: parsedDestinations
       }
     });
   } catch (error) {

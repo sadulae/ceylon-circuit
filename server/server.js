@@ -2,6 +2,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 console.log('Environment loaded. GEMINI_API_KEY exists:', !!process.env.GEMINI_API_KEY);
+console.log('Environment loaded. OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -10,6 +11,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fileUpload from 'express-fileupload';
 import cookieParser from 'cookie-parser';
+import { testGptConnection } from './test-gpt.js';
+import chatRoutes from './routes/chatRoutes.js';
 
 // Get __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -30,11 +33,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Updated CORS configuration
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Configure file upload
@@ -44,7 +49,6 @@ app.use(fileUpload({
   useTempFiles: true,
   tempFileDir: '/tmp/',
   abortOnLimit: false,
-  // Allow file upload on PUT requests
   parseNested: true,
   debug: process.env.NODE_ENV !== 'production'
 }));
@@ -52,25 +56,24 @@ app.use(fileUpload({
 // Make uploads folder static
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Log all requests
+// Make images folder static
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
+
+// Simplified request logging
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('Cookies:', req.cookies);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
-  console.log('Files:', req.files);
   next();
 });
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-    .then(() => {
-        console.log('MongoDB Connected Successfully');
-    })
-    .catch((err) => {
-        console.error('MongoDB Connection Error:', err);
-        process.exit(1);
-    });
+  .then(() => {
+    console.log('MongoDB Connected Successfully');
+  })
+  .catch((err) => {
+    console.error('MongoDB Connection Error:', err);
+    process.exit(1);
+  });
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -80,6 +83,7 @@ app.use('/api/accommodation', accRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/destinations', destinationRoutes);
 app.use('/api/tripbot', tripbotRoutes);
+app.use('/api/chat', chatRoutes);
 
 // API Root
 app.get('/api', (req, res) => {
@@ -91,17 +95,19 @@ app.get('/api', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    console.error('Error stack:', err.stack);
-    res.status(500).json({
-        success: false,
-        error: process.env.NODE_ENV === 'development' ? err.message : 'Server Error'
-    });
+  console.error('Error:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log('Environment:', process.env.NODE_ENV || 'development');
-    console.log('CORS Origin:', process.env.CORS_ORIGIN || 'http://localhost:3000');
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log('Environment:', process.env.NODE_ENV || 'development');
+  
+  // Test GPT API connection
+  await testGptConnection();
 }); 

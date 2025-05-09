@@ -75,6 +75,7 @@ import {
   deleteDestination
 } from '../../redux/slices/destinationSlice';
 import Swal from 'sweetalert2';
+import { getImageUrl } from '../../utils/imageUtils';
 
 const DestinationDetail = () => {
   const { id } = useParams();
@@ -334,9 +335,10 @@ const DestinationDetail = () => {
         <Box 
           sx={{ 
             height: '100%', 
-            backgroundImage: `url(${currentDestination.mainImage || (currentDestination.images && currentDestination.images.length > 0 
-              ? currentDestination.images[0] 
-              : 'https://source.unsplash.com/random?srilanka')})`,
+            backgroundImage: `url(${getImageUrl(currentDestination.mainImage) || 
+              (currentDestination.images && currentDestination.images.length > 0 
+                ? getImageUrl(currentDestination.images[0]) 
+                : 'https://source.unsplash.com/random?srilanka')})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             position: 'relative'
@@ -681,7 +683,7 @@ const DestinationDetail = () => {
                         <CardMedia
                           component="img"
                           height="200"
-                          image={image}
+                          image={getImageUrl(image)}
                           alt={`${currentDestination.name} - image ${index + 1}`}
                           sx={{ objectFit: 'cover' }}
                         />
@@ -926,7 +928,7 @@ const DestinationDetail = () => {
           {currentDestination.images && currentDestination.images.length > 0 && (
             <Box
               component="img"
-              src={currentDestination.images[currentImageIndex]}
+              src={getImageUrl(currentDestination.images[currentImageIndex])}
               alt={`${currentDestination.name} - image ${currentImageIndex + 1}`}
               sx={{
                 width: '100%',

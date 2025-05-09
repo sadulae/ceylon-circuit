@@ -1,505 +1,498 @@
 import React, { useState } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
+  Box, 
+  Typography, 
+  Paper, 
+  Tabs, 
+  Tab, 
   Divider,
-  Card,
+  Card, 
   CardContent,
   CardMedia,
-  Chip,
-  IconButton,
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent,
-  Paper,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
-  Avatar,
+  Chip,
   Grid,
+  Button,
+  Stepper,
+  Step,
+  StepLabel,
+  StepContent,
+  useTheme,
+  useMediaQuery,
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Tooltip
 } from '@mui/material';
-import { 
-  ExpandMore, 
-  Favorite, 
-  FavoriteBorder, 
-  Share, 
-  MoreVert, 
-  LocationOn, 
-  Hotel, 
-  Restaurant, 
-  DirectionsCar, 
-  DownloadForOffline, 
-  Star, 
-  StarBorder,
-  Language,
-  Person,
+import {
+  LocationOn,
+  Hotel,
+  Restaurant,
+  DirectionsCar,
+  AccessTime,
+  ExpandMore,
+  Today,
+  CheckCircleOutline,
+  Info,
+  LightMode,
+  Nightlight,
   LocalActivity,
-  AccessTimeOutlined
+  Luggage,
+  AttachMoney,
+  TravelExplore,
 } from '@mui/icons-material';
-import { saveTripPlan } from '../../services/aiService';
 
-const TripPlanViewer = ({ plan, onSave, onModify }) => {
-  const [activeStep, setActiveStep] = useState(0);
-  const [saved, setSaved] = useState(false);
-  
-  if (!plan || !plan.itinerary) {
+const TripPlanViewer = ({ tripPlan }) => {
+  const [currentTab, setCurrentTab] = useState(0);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  // Handle empty or missing trip plan
+  if (!tripPlan) {
     return (
-      <Box sx={{ p: 2, textAlign: 'center' }}>
-        <Typography variant="body1">No trip plan available</Typography>
-      </Box>
-    );
-  }
-  
-  const { summary, itinerary, tourGuide, tourPackages } = plan;
-  
-  const handleSave = async () => {
-    try {
-      await onSave();
-      setSaved(true);
-    } catch (error) {
-      console.error('Error saving plan:', error);
-    }
-  };
-  
-  const handleNext = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
-  };
-
-  const handleStepClick = (step) => {
-    setActiveStep(step);
-  };
-  
-  return (
-    <Box sx={{ width: '100%' }}>
-      <Typography variant="body1" sx={{ color: '#E2E8F0', mb: 3 }}>
-        {summary}
-      </Typography>
-      
-      {/* Day-by-day itinerary */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" sx={{ color: '#B2F5EA', mb: 2, fontWeight: 600 }}>
-          Day-by-Day Itinerary
+      <Box sx={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        p: 4,
+        bgcolor: '#f9fafb',
+      }}>
+        <Box 
+          component="img" 
+          src="https://placehold.co/300x200?text=Trip+Planner" 
+          alt="Map placeholder"
+          sx={{ 
+            width: '60%', 
+            maxWidth: 300,
+            opacity: 0.6,
+            mb: 4
+          }}
+        />
+        <Typography variant="h5" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
+          No trip plan available yet
         </Typography>
-        
-        <Stepper 
-          activeStep={activeStep} 
-          orientation="vertical" 
-          nonLinear
-          sx={{ 
-            '.MuiStepLabel-label': { color: '#E2E8F0' },
-            '.MuiStepLabel-iconContainer': { color: '#B2F5EA' },
-            '.MuiStepConnector-line': { borderColor: 'rgba(178,245,234,0.2)' }
-          }}
-        >
-          {itinerary.map((day, index) => (
-            <Step key={index} completed={false}>
-              <StepLabel 
-                onClick={() => handleStepClick(index)}
-                StepIconProps={{ 
-                  icon: `${day.day}`,
-                  sx: { cursor: 'pointer' }
-                }}
-              >
-                <Typography 
-                  variant="subtitle1" 
-                  sx={{ color: activeStep === index ? '#B2F5EA' : '#E2E8F0', cursor: 'pointer' }}
-                >
-                  Day {day.day}
-                </Typography>
-              </StepLabel>
-              <StepContent>
-                <Box sx={{ mb: 2 }}>
-                  {/* Destinations */}
-                  {day.destinations.map((dest, destIndex) => (
-                    <Card 
-                      key={destIndex} 
-                      sx={{ 
-                        mb: 2, 
-                        backgroundColor: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        backdropFilter: 'blur(8px)',
-                        color: '#E2E8F0'
-                      }}
-                    >
-                      {dest.image && (
-                        <CardMedia
-                          component="img"
-                          height="140"
-                          image={dest.image}
-                          alt={dest.name}
-                          sx={{ objectFit: 'cover' }}
-                        />
-                      )}
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                          <Typography variant="h6" sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-                            {dest.name}
-                          </Typography>
-                          <Chip 
-                            label={dest.category} 
-                            size="small" 
-                            sx={{ 
-                              backgroundColor: 'rgba(178,245,234,0.1)',
-                              color: '#B2F5EA', 
-                              border: '1px solid rgba(178,245,234,0.2)'
-                            }} 
-                          />
-                        </Box>
-                        
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                          <LocationOn fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5, color: '#B2F5EA' }} />
-                          {dest.location}
-                        </Typography>
-                        
-                        <Typography variant="body2" sx={{ mb: 2 }}>
-                          {dest.description}
-                        </Typography>
-                        
-                        {dest.activities && dest.activities.length > 0 && (
-                          <Box>
-                            <Typography variant="subtitle2" sx={{ color: '#B2F5EA', mb: 1 }}>
-                              Activities:
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                              {dest.activities.map((activity, actIndex) => (
-                                <Chip 
-                                  key={actIndex}
-                                  label={activity}
-                                  size="small"
-                                  sx={{ 
-                                    backgroundColor: 'rgba(255,255,255,0.05)',
-                                    color: '#E2E8F0'
-                                  }}
-                                />
-                              ))}
-                            </Box>
-                          </Box>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                  
-                  {/* Accommodation */}
-                  {day.accommodation && (
-                    <Card 
-                      sx={{ 
-                        mb: 2, 
-                        backgroundColor: 'rgba(30,41,55,0.7)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        backdropFilter: 'blur(8px)',
-                        color: '#E2E8F0'
-                      }}
-                    >
-                      <CardContent>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <Hotel sx={{ color: '#B2F5EA', mr: 1 }} />
-                          <Typography variant="h6" sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-                            {day.accommodation.name}
-                          </Typography>
-                        </Box>
-                        
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                          <LocationOn fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5, color: '#B2F5EA' }} />
-                          {day.accommodation.location}
-                        </Typography>
-                        
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                          {day.accommodation.address}
-                        </Typography>
-                        
-                        {day.accommodation.facilities && day.accommodation.facilities.length > 0 && (
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                            {day.accommodation.facilities.map((facility, facIndex) => (
-                              <Chip 
-                                key={facIndex}
-                                label={facility}
-                                size="small"
-                                sx={{ 
-                                  backgroundColor: 'rgba(255,255,255,0.05)',
-                                  color: '#E2E8F0'
-                                }}
-                              />
-                            ))}
-                          </Box>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )}
-                  
-                  {/* Meals */}
-                  {day.meals && day.meals.length > 0 && (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                      {day.meals.map((meal, mealIndex) => (
-                        <Chip 
-                          key={mealIndex}
-                          icon={<Restaurant sx={{ color: '#B2F5EA !important' }} />}
-                          label={meal}
-                          sx={{ 
-                            backgroundColor: 'rgba(178,245,234,0.1)',
-                            color: '#B2F5EA', 
-                            border: '1px solid rgba(178,245,234,0.2)'
-                          }}
-                        />
-                      ))}
-                    </Box>
-                  )}
-                </Box>
-                
-                {/* Navigation buttons */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Button
-                    disabled={activeStep === 0}
-                    onClick={handleBack}
-                    sx={{ 
-                      color: '#B2F5EA',
-                      '&.Mui-disabled': {
-                        color: 'rgba(178,245,234,0.3)'
-                      }
-                    }}
-                  >
-                    Previous Day
-                  </Button>
-                  <Button
-                    disabled={activeStep === itinerary.length - 1}
-                    onClick={handleNext}
-                    sx={{ 
-                      color: '#B2F5EA',
-                      '&.Mui-disabled': {
-                        color: 'rgba(178,245,234,0.3)'
-                      }
-                    }}
-                  >
-                    Next Day
-                  </Button>
-                </Box>
-              </StepContent>
-            </Step>
-          ))}
-        </Stepper>
-      </Box>
-      
-      {/* Tour Guide */}
-      {tourGuide && (
-        <Accordion 
-          sx={{ 
-            backgroundColor: 'rgba(255,255,255,0.05)',
-            color: '#E2E8F0',
-            mb: 2,
-            '&:before': {
-              display: 'none',
-            },
-            border: '1px solid rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(8px)',
-          }}
-        >
-          <AccordionSummary expandIcon={<ExpandMore sx={{ color: '#B2F5EA' }} />}>
-            <Typography variant="h6" sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-              Tour Guide
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-              <Avatar 
-                sx={{ 
-                  width: 56, 
-                  height: 56,
-                  backgroundColor: 'rgba(178,245,234,0.2)', 
-                  color: '#B2F5EA',
-                  border: '1px solid rgba(178,245,234,0.3)',
-                }}
-              >
-                <Person />
-              </Avatar>
-              <Box>
-                <Typography variant="subtitle1" sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-                  {tourGuide.name}
-                </Typography>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-                    {[...Array(5)].map((_, i) => (
-                      i < Math.floor(tourGuide.rating) 
-                        ? <Star key={i} fontSize="small" sx={{ color: '#F59E0B' }} />
-                        : <StarBorder key={i} fontSize="small" sx={{ color: '#F59E0B' }} />
-                    ))}
-                  </Box>
-                  <Typography variant="body2">
-                    {tourGuide.experience}+ years experience
-                  </Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Language fontSize="small" sx={{ color: '#B2F5EA', mr: 0.5 }} />
-                  <Typography variant="body2">
-                    Languages: {tourGuide.languages.join(', ')}
-                  </Typography>
-                </Box>
-                
-                {tourGuide.specializations && (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                    {tourGuide.specializations.map((spec, index) => (
-                      <Chip 
-                        key={index}
-                        label={spec}
-                        size="small"
-                        icon={<LocalActivity sx={{ color: '#B2F5EA !important' }} />}
-                        sx={{ 
-                          backgroundColor: 'rgba(178,245,234,0.1)',
-                          color: '#B2F5EA', 
-                          border: '1px solid rgba(178,245,234,0.2)'
-                        }}
-                      />
-                    ))}
-                  </Box>
-                )}
-              </Box>
-            </Box>
-          </AccordionDetails>
-        </Accordion>
-      )}
-      
-      {/* Tour Packages */}
-      {tourPackages && tourPackages.length > 0 && (
-        <Accordion 
-          sx={{ 
-            backgroundColor: 'rgba(255,255,255,0.05)',
-            color: '#E2E8F0',
-            mb: 2,
-            '&:before': {
-              display: 'none',
-            },
-            border: '1px solid rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(8px)',
-          }}
-        >
-          <AccordionSummary expandIcon={<ExpandMore sx={{ color: '#B2F5EA' }} />}>
-            <Typography variant="h6" sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-              Recommended Tour Packages
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={2}>
-              {tourPackages.map((pack, index) => (
-                <Grid item xs={12} sm={6} key={index}>
-                  <Card sx={{ 
-                    backgroundColor: 'rgba(30,41,55,0.7)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    color: '#E2E8F0'
-                  }}>
-                    <CardContent>
-                      <Typography variant="h6" sx={{ color: '#B2F5EA', fontWeight: 600, mb: 1 }}>
-                        {pack.name}
-                      </Typography>
-                      
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 1 }}>
-                        <Chip 
-                          icon={<AccessTimeOutlined sx={{ color: '#B2F5EA !important' }} />}
-                          label={`${pack.duration} days`}
-                          size="small"
-                          sx={{ 
-                            backgroundColor: 'rgba(178,245,234,0.1)',
-                            color: '#B2F5EA', 
-                            border: '1px solid rgba(178,245,234,0.2)'
-                          }}
-                        />
-                        <Chip 
-                          label={pack.difficulty}
-                          size="small"
-                          sx={{ 
-                            backgroundColor: 'rgba(255,255,255,0.05)',
-                            color: '#E2E8F0'
-                          }}
-                        />
-                        <Chip 
-                          label={pack.mealOptions}
-                          icon={<Restaurant sx={{ color: '#B2F5EA !important' }} />}
-                          size="small"
-                          sx={{ 
-                            backgroundColor: 'rgba(178,245,234,0.1)',
-                            color: '#B2F5EA', 
-                            border: '1px solid rgba(178,245,234,0.2)'
-                          }}
-                        />
-                      </Box>
-                      
-                      <Typography variant="body2" sx={{ mb: 2 }}>
-                        {pack.description}
-                      </Typography>
-                      
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="subtitle1" sx={{ color: '#B2F5EA', fontWeight: 600 }}>
-                          ${pack.price} USD
-                        </Typography>
-                        <Button 
-                          variant="outlined" 
-                          size="small" 
-                          sx={{ 
-                            borderColor: 'rgba(178,245,234,0.3)', 
-                            color: '#B2F5EA',
-                            '&:hover': {
-                              borderColor: 'rgba(178,245,234,0.6)',
-                              backgroundColor: 'rgba(178,245,234,0.1)'
-                            }
-                          }}
-                        >
-                          View Details
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
-      )}
-      
-      {/* Action Buttons */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-        <Button 
-          variant="outlined" 
-          onClick={onModify}
-          sx={{ 
-            borderColor: 'rgba(178,245,234,0.3)', 
-            color: '#B2F5EA',
-            '&:hover': {
-              borderColor: 'rgba(178,245,234,0.6)',
-              backgroundColor: 'rgba(178,245,234,0.1)'
-            }
-          }}
-        >
-          Modify Plan
-        </Button>
-        
+        <Typography color="text.secondary" sx={{ mb: 4, textAlign: 'center' }}>
+          Chat with our AI assistant to create your personalized Sri Lanka travel itinerary
+        </Typography>
         <Button 
           variant="contained" 
           color="primary"
-          onClick={handleSave}
-          disabled={saved}
-          sx={{ 
-            backgroundColor: saved ? 'rgba(52,211,153,0.8)' : 'rgba(178,245,234,0.2)',
-            color: '#B2F5EA',
+          onClick={() => window.location.reload()}
+          sx={{
+            bgcolor: '#4FD1C5',
             '&:hover': {
-              backgroundColor: 'rgba(178,245,234,0.3)'
+              bgcolor: '#38A89D',
             }
           }}
         >
-          {saved ? 'Plan Saved!' : 'Save Plan'}
+          Start Planning
         </Button>
+      </Box>
+    );
+  }
+
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
+  const renderDayCard = (day, index) => {
+    return (
+      <Card 
+        elevation={2} 
+        sx={{ 
+          mb: 3, 
+          borderRadius: 2,
+          overflow: 'visible',
+          position: 'relative'
+        }}
+        key={`day-${index}`}
+      >
+        <Box sx={{ position: 'relative' }}>
+          <CardMedia
+            component="img"
+            height="180"
+            image={`https://source.unsplash.com/featured/?srilanka,${day.destinations.join(',')}`}
+            alt={day.title}
+            sx={{ borderTopLeftRadius: 8, borderTopRightRadius: 8 }}
+          />
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            width: '100%', 
+            height: '100%',
+            background: 'linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%)',
+            borderTopLeftRadius: 8,
+            borderTopRightRadius: 8
+          }} />
+          <Box sx={{ 
+            position: 'absolute', 
+            bottom: 0, 
+            left: 0, 
+            p: 2, 
+            width: '100%', 
+            color: 'white'
+          }}>
+            <Typography variant="h6" fontWeight="bold">
+              Day {day.day}: {day.title}
+            </Typography>
+          </Box>
+        </Box>
+
+        <CardContent sx={{ pt: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <LocationOn sx={{ mr: 1, color: '#4FD1C5' }} />
+                  Destinations
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {day.destinations.map((dest, i) => (
+                    <Chip
+                      key={`dest-${i}`}
+                      label={dest}
+                      size="small"
+                      icon={<TravelExplore fontSize="small" />}
+                      sx={{ 
+                        bgcolor: 'rgba(79, 209, 197, 0.1)', 
+                        color: '#2C7A7B',
+                        borderColor: 'rgba(79, 209, 197, 0.3)',
+                        border: '1px solid'
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Hotel sx={{ mr: 1, color: '#4FD1C5' }} />
+                Accommodation
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                {day.accommodation}
+              </Typography>
+
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <DirectionsCar sx={{ mr: 1, color: '#4FD1C5' }} />
+                  Travel Details
+                </Typography>
+                <List dense disablePadding>
+                  {day.travelTimes?.map((travel, i) => (
+                    <ListItem key={`travel-${i}`} disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <AccessTime fontSize="small" color="action" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={travel} 
+                        primaryTypographyProps={{ 
+                          variant: 'body2',
+                          color: 'text.secondary'
+                        }} 
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <LocalActivity sx={{ mr: 1, color: '#4FD1C5' }} />
+                  Activities
+                </Typography>
+                <List dense disablePadding>
+                  {day.activities?.map((activity, i) => (
+                    <ListItem key={`activity-${i}`} disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <CheckCircleOutline fontSize="small" color="success" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={activity} 
+                        primaryTypographyProps={{ variant: 'body2' }} 
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Restaurant sx={{ mr: 1, color: '#4FD1C5' }} />
+                  Meals
+                </Typography>
+                <List dense disablePadding>
+                  {day.meals?.breakfast && (
+                    <ListItem disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <LightMode fontSize="small" color="warning" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={`Breakfast: ${day.meals.breakfast}`} 
+                        primaryTypographyProps={{ 
+                          variant: 'body2',
+                          color: 'text.secondary'
+                        }} 
+                      />
+                    </ListItem>
+                  )}
+                  {day.meals?.lunch && (
+                    <ListItem disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <Today fontSize="small" color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={`Lunch: ${day.meals.lunch}`} 
+                        primaryTypographyProps={{ 
+                          variant: 'body2',
+                          color: 'text.secondary'
+                        }} 
+                      />
+                    </ListItem>
+                  )}
+                  {day.meals?.dinner && (
+                    <ListItem disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <Nightlight fontSize="small" color="action" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={`Dinner: ${day.meals.dinner}`} 
+                        primaryTypographyProps={{ 
+                          variant: 'body2',
+                          color: 'text.secondary'
+                        }} 
+                      />
+                    </ListItem>
+                  )}
+                </List>
+              </Box>
+            </Grid>
+          </Grid>
+
+          <Accordion 
+            elevation={0} 
+            sx={{ 
+              '&:before': { display: 'none' },
+              bgcolor: 'transparent' 
+            }}
+          >
+            <AccordionSummary
+              expandIcon={<ExpandMore />}
+              sx={{ 
+                px: 0, 
+                '&.Mui-expanded': { minHeight: 0 },
+                '& .MuiAccordionSummary-content.Mui-expanded': { margin: '12px 0' }
+              }}
+            >
+              <Typography variant="subtitle2" color="primary">
+                View Day Details
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ px: 0 }}>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                {day.description}
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderEssentials = () => {
+    const { essentials } = tripPlan;
+    
+    if (!essentials) {
+      return (
+        <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', my: 4 }}>
+          No trip essentials available.
+        </Typography>
+      );
+    }
+    
+    return (
+      <Box sx={{ p: 2 }}>
+        <Grid container spacing={3}>
+          {/* Packing List */}
+          <Grid item xs={12} md={6}>
+            <Card elevation={2} sx={{ height: '100%', borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Luggage sx={{ mr: 1, color: '#4FD1C5' }} />
+                  Packing List
+                </Typography>
+                <List dense>
+                  {essentials.packingList?.map((item, i) => (
+                    <ListItem key={`packing-${i}`} disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <CheckCircleOutline fontSize="small" color="success" />
+                      </ListItemIcon>
+                      <ListItemText primary={item} primaryTypographyProps={{ variant: 'body2' }} />
+                    </ListItem>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          {/* Travel Tips */}
+          <Grid item xs={12} md={6}>
+            <Card elevation={2} sx={{ height: '100%', borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Info sx={{ mr: 1, color: '#4FD1C5' }} />
+                  Travel Tips
+                </Typography>
+                <List dense>
+                  {essentials.travelTips?.map((tip, i) => (
+                    <ListItem key={`tip-${i}`} disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <CheckCircleOutline fontSize="small" color="success" />
+                      </ListItemIcon>
+                      <ListItemText primary={tip} primaryTypographyProps={{ variant: 'body2' }} />
+                    </ListItem>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          {/* Cultural Notes */}
+          <Grid item xs={12} md={6}>
+            <Card elevation={2} sx={{ height: '100%', borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <TravelExplore sx={{ mr: 1, color: '#4FD1C5' }} />
+                  Cultural Notes
+                </Typography>
+                <List dense>
+                  {essentials.culturalNotes?.map((note, i) => (
+                    <ListItem key={`note-${i}`} disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <CheckCircleOutline fontSize="small" color="success" />
+                      </ListItemIcon>
+                      <ListItemText primary={note} primaryTypographyProps={{ variant: 'body2' }} />
+                    </ListItem>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          {/* Estimated Cost */}
+          <Grid item xs={12} md={6}>
+            <Card elevation={2} sx={{ height: '100%', borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <AttachMoney sx={{ mr: 1, color: '#4FD1C5' }} />
+                  Estimated Cost
+                </Typography>
+                <Typography variant="body1" paragraph>
+                  {essentials.estimatedCost}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  };
+
+  return (
+    <Box sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      bgcolor: '#f9fafb'
+    }}>
+      {/* Header */}
+      <Box sx={{ 
+        p: 2, 
+        bgcolor: '#4FD1C5', 
+        color: 'white',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <Typography variant="h6" sx={{ fontFamily: "'Poppins', sans-serif" }}>
+          {tripPlan.title || `${tripPlan.duration}-Day Sri Lanka Trip Plan`}
+        </Typography>
+        <Typography variant="body2">
+          {tripPlan.summary || 'Your personalized day-by-day Sri Lanka travel itinerary'}
+        </Typography>
+      </Box>
+
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'white' }}>
+        <Tabs 
+          value={currentTab} 
+          onChange={handleTabChange} 
+          variant="fullWidth"
+          sx={{
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 500,
+              fontSize: '0.9rem',
+            },
+            '& .Mui-selected': {
+              color: '#4FD1C5',
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: '#4FD1C5',
+            }
+          }}
+        >
+          <Tab label="Day-by-Day Itinerary" />
+          <Tab label="Trip Essentials" />
+        </Tabs>
+      </Box>
+
+      {/* Content */}
+      <Box sx={{ 
+        flexGrow: 1, 
+        overflow: 'auto', 
+        p: 2,
+      }}>
+        {/* Day-by-Day Itinerary */}
+        <Box sx={{ display: currentTab === 0 ? 'block' : 'none' }}>
+          {isMobile ? (
+            <Box>
+              {tripPlan.itinerary?.map((day, index) => renderDayCard(day, index))}
+            </Box>
+          ) : (
+            <Stepper orientation="vertical" nonLinear activeStep={-1}>
+              {tripPlan.itinerary?.map((day, index) => (
+                <Step key={`step-${index}`} expanded>
+                  <StepLabel 
+                    StepIconProps={{ 
+                      active: true,
+                      icon: day.day
+                    }}
+                  >
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      {day.title}
+                    </Typography>
+                  </StepLabel>
+                  <StepContent sx={{ pb: 3 }}>
+                    {renderDayCard(day, index)}
+                  </StepContent>
+                </Step>
+              ))}
+            </Stepper>
+          )}
+        </Box>
+
+        {/* Trip Essentials */}
+        <Box sx={{ display: currentTab === 1 ? 'block' : 'none' }}>
+          {renderEssentials()}
+        </Box>
       </Box>
     </Box>
   );
 };
 
-export default TripPlanViewer; 
+export default TripPlanViewer;

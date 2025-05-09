@@ -1,22 +1,28 @@
 import express from 'express';
-const router = express.Router();
 import { protect } from '../middleware/auth.js';
 import {
   generateTripPlan,
   saveTripPlan,
   getTripPlan,
   updateTripPlan,
-  chatHandler,
   getRecommendations,
   generatePlanPDF,
   getDestinationDetails,
   getNearbyAttractions
 } from '../controllers/tripbot.js';
+import { handleChat } from '../controllers/chatController.js';
+import OpenAI from 'openai';
+
+const router = express.Router();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // @route   POST api/tripbot/chat
 // @desc    Process chat messages and generate AI responses
 // @access  Public
-router.post('/chat', chatHandler);
+router.post('/chat', handleChat);
 
 // @route   POST api/tripbot/recommendations
 // @desc    Get recommended destinations based on user preferences
@@ -57,5 +63,36 @@ router.get('/destination/:id', getDestinationDetails);
 // @desc    Get nearby attractions for a destination
 // @access  Public
 router.get('/destination/:id/nearby', getNearbyAttractions);
+
+router.post('/generate', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo-16k",
+      messages: [
+        {
+          role: "system",
+          content: "You are a knowledgeable Sri Lankan travel expert. You will help create detailed travel itineraries based on the user's preferences. Use only factual information about Sri Lankan destinations, attractions, and activities. Format your response as a valid JSON object."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000,
+    });
+
+    // Parse the response to ensure it's valid JSON
+    const responseText = completion.choices[0].message.content;
+    const itinerary = JSON.parse(responseText);
+
+    res.json(itinerary);
+  } catch (error) {
+    console.error('Error generating itinerary:', error);
+    res.status(500).json({ error: 'Failed to generate itinerary' });
+  }
+});
 
 export default router;
