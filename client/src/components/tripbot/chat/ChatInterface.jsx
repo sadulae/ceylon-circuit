@@ -18,13 +18,11 @@ import {
   CardActionArea,
 } from '@mui/material';
 import {
-  Send as SendIcon,
   Refresh as RefreshIcon,
   TravelExplore as TravelExploreIcon,
   Article as ArticleIcon,
-  NavigateNext as NavigateNextIcon,
   Check as CheckIcon,
-  LocationOn as LocationOn,
+  LocationOn,
 } from '@mui/icons-material';
 import axios from 'axios';
 import ChatMessage from './ChatMessage';
@@ -48,7 +46,16 @@ const getImageUrl = (imageUrl) => {
   return `http://localhost:5000/uploads/${imageUrl}`;
 };
 
-const ChatInterface = ({ onTripPlanGenerated }) => {
+// Helper function to extract duration from user message
+const extractDurationFromMessage = (message) => {
+  const durationMatch = message.match(/(\d+)\s*(?:-\s*\d+)?\s*days?/i);
+  if (durationMatch) {
+    return parseInt(durationMatch[1]);
+  }
+  return null;
+};
+
+const ChatInterface = ({ onTripPlanGenerated, isDarkMode = false }) => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -70,6 +77,9 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
     recentInterests: [],
     buttonSelectionCount: 0
   });
+
+  // Add a state to track if user is a returning visitor
+  const [visitorType, setVisitorType] = useState(null); // 'new', 'returning', or null
 
   // Scroll to bottom of chat
   const scrollToBottom = () => {
@@ -113,14 +123,13 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
           greetingMessage = response.data.greeting;
         } else {
           console.log('API greeting not available, using fallback');
-          greetingMessage = "Welcome to Ceylon Circuit! 🌴 I'm your AI travel assistant. How many days are you planning to stay in Sri Lanka?";
+          greetingMessage = "Welcome to Ceylon Circuit! 🌴 I'm your AI travel assistant. How can I help you plan your perfect Sri Lankan adventure today?";
         }
         
         const initialMessage = {
           type: 'bot',
           content: greetingMessage,
-          suggestions: ['2 days', '3 days', '5 days', '7 days'],
-          expectingDuration: true,
+          suggestions: ['Help me plan a trip', 'Tell me about Sri Lanka', 'Show popular destinations'],
           id: `greeting-${Date.now()}`
         };
         
@@ -131,9 +140,8 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
         // Fallback to default greeting if API fails
         const initialMessage = {
           type: 'bot',
-          content: "Welcome to Ceylon Circuit! 🌴 I'm your AI travel assistant. How many days are you planning to stay in Sri Lanka?",
-          suggestions: ['2 days', '3 days', '5 days', '7 days'],
-          expectingDuration: true,
+          content: "Welcome to Ceylon Circuit! 🌴 I'm your AI travel assistant. How can I help you plan your perfect Sri Lankan adventure today?",
+          suggestions: ['Help me plan a trip', 'Tell me about Sri Lanka', 'Show popular destinations'],
           id: `greeting-fallback-${Date.now()}`
         };
         
@@ -147,6 +155,7 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
     setSelectedDestinations({});
     setSelectedAccommodation({});
     setTripPlanData(null);
+    setVisitorType(null);
     
     // Fetch greeting and destinations
     fetchInitialGreeting();
@@ -339,6 +348,7 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
     return remainingSuggestions.map(d => d.name);
   };
 
+  // Modify the handleSendMessage function to properly handle the help request
   const handleSendMessage = async (messageText) => {
     try {
       setError(null);
@@ -349,25 +359,120 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
       const newUserMessage = { type: 'user', content: userMessage, id: `user-${Date.now()}` };
       setMessages(prev => [...prev, newUserMessage]);
 
-      // Check if message is off-topic (not travel related)
-      const offTopicKeywords = [
-        'largest country', 'capital of', 'population of', 'president of', 
-        'who is', 'what is', 'when was', 'how many', 'tell me about',
-        'math', 'calculate', 'solve', 'weather in', 'temperature'
-      ];
-      
-      const isOffTopic = offTopicKeywords.some(keyword => 
-        userMessage.toLowerCase().includes(keyword.toLowerCase())
-      );
-      
-      if (isOffTopic && !userMessage.toLowerCase().includes('sri lanka')) {
-        // Respond with a redirection to travel planning
-        setMessages(prev => [...prev, {
+      // Check for help planning phrases
+      if ((userMessage.toLowerCase().includes('help me') || 
+           userMessage.toLowerCase().includes('create a plan') ||
+           userMessage.toLowerCase().includes('plan my trip') ||
+           userMessage.toLowerCase().includes('help plan') ||
+           userMessage.toLowerCase().includes('plan a trip')) && 
+          !visitorType) {
+        
+        // Add a response asking if they've been to Sri Lanka before
+        const visitorQuestion = {
           type: 'bot',
-          content: "I'm focused on helping you plan your perfect Sri Lanka trip. Let's stay on topic and continue with your travel planning. What else would you like to know about destinations or accommodations in Sri Lanka?",
-          suggestions: ['Show destinations', 'Tell me about accommodations', 'Sri Lanka travel tips'],
-          id: `redirect-${Date.now()}`
-        }]);
+          content: "I'd be happy to help you plan your trip! Before we start, have you visited Sri Lanka before? This will help me tailor recommendations to your experience level.",
+          suggestions: ["Yes, I've visited before", "No, this is my first time"],
+          expectingVisitorType: true,
+          id: `visitor-type-${Date.now()}`
+        };
+        
+        setMessages(prev => [...prev, visitorQuestion]);
+        setPlanningMode(true); // Activate planning mode to show side panel
+        return;
+      }
+      
+      // Check for visitor type response
+      if (!visitorType && messages.some(msg => msg.expectingVisitorType)) {
+        if (userMessage.toLowerCase().includes('yes') || 
+            userMessage.toLowerCase().includes('before') ||
+            userMessage.toLowerCase().includes('visited')) {
+          
+          setVisitorType('returning');
+          const response = {
+            type: 'bot',
+            content: "Great to have you back! Since you're familiar with Sri Lanka, I can help you explore new areas or revisit your favorites. How many days are you planning to stay this time?",
+            suggestions: ['2-3 days', '4-5 days', '7 days', '10+ days'],
+            expectingDuration: true,
+            id: `returning-visitor-${Date.now()}`
+          };
+          
+          setMessages(prev => [...prev, response]);
+          
+          // Update context
+          setConversationContext(prev => ({
+            ...prev,
+            visitorType: 'returning'
+          }));
+          
+          return;
+        } else if (userMessage.toLowerCase().includes('no') || 
+                  userMessage.toLowerCase().includes('first time') ||
+                  userMessage.toLowerCase().includes('first visit')) {
+          
+          setVisitorType('new');
+          const response = {
+            type: 'bot',
+            content: "Welcome to your first Sri Lankan adventure! You're going to love it here. For first-time visitors, I recommend focusing on the cultural triangle and southern beaches. How many days will you be staying?",
+            suggestions: ['2-3 days', '4-5 days', '7 days', '10+ days'],
+            expectingDuration: true,
+            id: `new-visitor-${Date.now()}`
+          };
+          
+          setMessages(prev => [...prev, response]);
+          
+          // Update context
+          setConversationContext(prev => ({
+            ...prev,
+            visitorType: 'new'
+          }));
+          
+          return;
+        }
+      }
+
+      // Process duration selection if a number of days is mentioned
+      const days = extractDurationFromMessage(userMessage);
+      if (days && !tripDuration && (visitorType || messages.some(msg => msg.expectingDuration))) {
+        handleDurationSelect(days);
+        return;
+      }
+
+      // Check if the message is about Sri Lanka information
+      if (userMessage.toLowerCase().includes('about sri lanka') ||
+          userMessage.toLowerCase().includes('tell me about sri') ||
+          userMessage.toLowerCase().includes('what is sri lanka') ||
+          userMessage.toLowerCase().includes('learn about sri')) {
+            
+        // Provide information about Sri Lanka without mentioning specific cities
+        const sriLankaInfo = {
+          type: 'bot',
+          content: "Sri Lanka is a beautiful island nation in South Asia known for its stunning landscapes, rich history, and vibrant culture. You'll find pristine beaches, ancient rock fortresses, lush tea plantations, and wonderful wildlife. The country offers diverse experiences from relaxing by the ocean to discovering ancient ruins and immersing yourself in local traditions. Would you like me to help you plan a trip to experience Sri Lanka's beauty?",
+          suggestions: ['Help me plan a trip', 'Show available destinations', 'Tell me about local cuisine'],
+          id: `sri-lanka-info-${Date.now()}`
+        };
+        
+        setMessages(prev => [...prev, sriLankaInfo]);
+        return;
+      }
+      
+      // Handle showing destinations
+      if (userMessage.toLowerCase().includes('destinations') ||
+          userMessage.toLowerCase().includes('places to visit') ||
+          userMessage.toLowerCase().includes('show me places')) {
+        
+        const destinationsResponse = {
+          type: 'bot',
+          content: "Here are some popular destinations in Sri Lanka that you can include in your itinerary:",
+          id: `destinations-info-${Date.now()}`
+        };
+        
+        setMessages(prev => [...prev, destinationsResponse]);
+        
+        // Show destinations after a short delay
+        setTimeout(() => {
+          fetchAndShowDestinations();
+        }, 500);
+        
         return;
       }
 
@@ -388,10 +493,6 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
       );
       
       if (mentionedNonDbDest) {
-        // Add user message to chat
-        const newUserMessage = { type: 'user', content: userMessage };
-        setMessages(prev => [...prev, newUserMessage]);
-        
         // Respond with a clarification about available destinations
         setMessages(prev => [...prev, {
           type: 'bot',
@@ -413,10 +514,6 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
       );
       
       if (mentionsSpecificDestination) {
-        // Add user message to chat
-        const newUserMessage = { type: 'user', content: userMessage };
-        setMessages(prev => [...prev, newUserMessage]);
-        
         // Add a conversational response about the destination
         const botResponse = {
           type: 'bot',
@@ -425,78 +522,13 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
         
         setMessages(prev => [...prev, botResponse]);
         
-        // Immediately show destinations
-        setTimeout(() => {
-          fetchAndShowDestinations();
-        }, 300);
-        setIsLoading(false);
-        return;
-      }
-
-      // Additional keywords that should trigger destinations
-      const destinationTriggerPhrases = [
-        'where can i go', 'where to go', 'places to visit',
-        'recommend destination', 'suggest place', 'popular destination',
-        'destination option', 'available destination', 'where to visit',
-        'which place', 'top place', 'best destination', 'tourist spot',
-        'attraction', 'landmark', 'site to see', 'recommendation'
-      ];
-      
-      const containsDestinationTrigger = destinationTriggerPhrases.some(phrase => 
-        userMessage.toLowerCase().includes(phrase.toLowerCase())
-      );
-      
-      if (containsDestinationTrigger) {
-        // Add a quick bot response
-        const botResponse = {
-          type: 'bot',
-          content: 'Here are all the destinations in our database. These are the only places we can include in your itinerary. Please select the ones you\'re interested in:',
-        };
-        
-        setMessages(prev => [...prev, botResponse]);
-        
-        // Immediately show destinations
-        setTimeout(() => {
-          fetchAndShowDestinations();
-        }, 300);
-        setIsLoading(false);
-        return;
-      }
-
-      // Check for interests or "any" to immediately show destinations
-      const interestKeywords = ['beach', 'wildlife', 'culture', 'adventure', 'food', 'history', 'any', 'all', 'everything', 'mix'];
-      const hasInterestKeyword = interestKeywords.some(keyword => 
-        userMessage.toLowerCase().includes(keyword.toLowerCase())
-      );
-
-      // Check if they've already specified a duration and now expressing interests
-      if (tripDuration > 0 && hasInterestKeyword) {
-        // Don't wait for AI response, immediately show destinations
-        if (userMessage.toLowerCase().includes('any') || userMessage.toLowerCase().includes('all') || 
-            userMessage.toLowerCase().includes('everything') || userMessage.toLowerCase().includes('mix')) {
-          // If they say "any" or "all" interests, just store basic interest info
-          setTripPlanData(prev => ({
-            ...prev,
-            interests: ['general tourism']
-          }));
-        } else {
-          // Store specific interests mentioned
-          const mentionedInterests = interestKeywords.filter(keyword => 
-            userMessage.toLowerCase().includes(keyword.toLowerCase())
-          );
-          setTripPlanData(prev => ({
-            ...prev,
-            interests: mentionedInterests
-          }));
-        }
-        
         // Add a quick bot response about showing destinations
-        const botResponse = {
+        const destinationMessage = {
           type: 'bot',
           content: 'Great! Based on your interests, here are destinations from our database that you can choose for your trip:',
         };
         
-        setMessages(prev => [...prev, botResponse]);
+        setMessages(prev => [...prev, destinationMessage]);
         
         // Immediately show destinations without waiting for AI
         setTimeout(() => {
@@ -522,14 +554,6 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
       // Special keyword handling
       if (userMessage.toLowerCase().includes('show destinations') || userMessage.includes('show places')) {
         await fetchAndShowDestinations();
-        return;
-      }
-
-      // Process duration selection if a number of days is mentioned
-      const durationMatch = userMessage.match(/(\d+)\s*days?/i);
-      if (durationMatch && !tripDuration) {
-        const days = parseInt(durationMatch[1]);
-        handleDurationSelect(days);
         return;
       }
 
@@ -1039,9 +1063,8 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
   const handleReset = () => {
     const initialMessage = {
       type: 'bot',
-      content: "Welcome to Ceylon Circuit! 🌴 I'm your AI travel assistant. How many days are you planning to stay in Sri Lanka?",
-      suggestions: ['2 days', '3 days', '5 days', '7 days'],
-      expectingDuration: true,
+      content: "Welcome to Ceylon Circuit! 🌴 I'm your AI travel assistant. How can I help you plan your perfect Sri Lankan adventure today?",
+      suggestions: ['Help me plan a trip', 'Tell me about Sri Lanka', 'Show popular destinations'],
       id: `initial-greeting-${Date.now()}`
     };
     
@@ -1060,6 +1083,53 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
 
   // Process message or suggestion based on content
   const processMessage = (message) => {
+    // Check for visitor type messages first
+    if (message.toLowerCase().includes('first time') || 
+        message.toLowerCase().includes('never been') ||
+        message.toLowerCase().includes('first visit')) {
+      
+      setVisitorType('new');
+      setMessages(prev => [...prev, { 
+        type: 'user', 
+        content: message,
+        id: `user-visitor-${Date.now()}`
+      }]);
+      
+      const response = {
+        type: 'bot',
+        content: "Welcome to your first Sri Lankan adventure! You're going to love it here. For first-time visitors, I recommend focusing on the cultural triangle and southern beaches. How many days will you be staying?",
+        suggestions: ['2-3 days', '4-5 days', '7 days', '10+ days'],
+        expectingDuration: true,
+        id: `new-visitor-${Date.now()}`
+      };
+      
+      setMessages(prev => [...prev, response]);
+      return;
+    }
+    
+    if (message.toLowerCase().includes('visited before') || 
+        message.toLowerCase().includes('been there') ||
+        message.toLowerCase().includes('returning')) {
+      
+      setVisitorType('returning');
+      setMessages(prev => [...prev, { 
+        type: 'user', 
+        content: message,
+        id: `user-visitor-${Date.now()}`
+      }]);
+      
+      const response = {
+        type: 'bot',
+        content: "Great to have you back! Since you're familiar with Sri Lanka, I can help you explore new areas or revisit your favorites. How many days are you planning to stay this time?",
+        suggestions: ['2-3 days', '4-5 days', '7 days', '10+ days'],
+        expectingDuration: true,
+        id: `returning-visitor-${Date.now()}`
+      };
+      
+      setMessages(prev => [...prev, response]);
+      return;
+    }
+    
     // Special handling for accommodation-related messages
     if (message.toLowerCase().includes('choose accommodations') || 
         message.toLowerCase().includes('select accommodations')) {
@@ -1073,21 +1143,6 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
         type: 'user', 
         content: message,
         id: `user-accommodation-${Date.now()}`
-      }]);
-      
-      // Add user message
-      setMessages(prev => [...prev, { 
-        type: 'user', 
-        content: message,
-        id: `user-question-${Date.now()}`
-      }]);
-      
-      // Respond with guidance about multiple destinations
-      setMessages(prev => [...prev, { 
-        type: 'bot', 
-        content: `You can select multiple destinations for each day of your trip. This gives you complete control over your itinerary. Just click on the destination cards you're interested in. Selected destinations will be highlighted, and you can click again to remove them if you change your mind.`,
-        suggestions: ['Show destinations again', 'Tips for selecting destinations'],
-        id: `destination-guidance-${Date.now()}`
       }]);
       
       // Make sure the day is valid
@@ -1116,6 +1171,13 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
         suggestions: ['Show destinations again', 'Tips for selecting destinations'],
         id: `destination-guidance-${Date.now()}`
       }]);
+      return;
+    }
+    
+    // Handle duration selection with extractDurationFromMessage
+    const days = extractDurationFromMessage(message);
+    if (days && !tripDuration) {
+      handleDurationSelect(days);
       return;
     }
     
@@ -1180,61 +1242,34 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
       }
     }
 
-    // Handle duration selection - comprehensive check for various formats
-    const durationMatches = [
-      message.match(/(\d+)\s*days?/i),                    // 2 days, 2 day
-      message.match(/(\w+)\s*days?/i),                    // two days, three day
-      message.match(/stay(?:ing)?\s*for\s*(\d+)/i),       // staying for 2
-      message.match(/^(\d+)$/),                           // just a number
-      message.match(/^(\w+)$/)                            // just a word like "two"
-    ].filter(Boolean);
-    
-    if (durationMatches.length > 0) {
-      const durationMatch = durationMatches[0];
-      let days = 0;
+    // When user says "help me plan a trip" or similar and we know visitor type
+    if ((message.toLowerCase().includes('help me plan') || 
+        message.toLowerCase().includes('plan a trip') || 
+        message.toLowerCase().includes('create itinerary')) &&
+        visitorType) {
       
-      // If number is in word form, convert to numeric
-      if (isNaN(parseInt(durationMatch[1]))) {
-        const wordToNumber = {
-          'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
-          'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+      // Ask for duration if not already set
+      if (!tripDuration) {
+        const durationMessage = {
+          type: 'bot',
+          content: 'Great! To start planning your trip, how many days will you be staying in Sri Lanka?',
+          suggestions: ['2-3 days', '4-5 days', '7 days', '10+ days'],
+          expectingDuration: true
         };
         
-        const word = durationMatch[1].toLowerCase();
-        days = wordToNumber[word] || 0;
-        
-        console.log("Word duration detected:", word, "converted to", days);
+        setMessages(prev => [...prev, { type: 'user', content: message }, durationMessage]);
       } else {
-        days = parseInt(durationMatch[1]);
+        // If duration is set, show destinations
+        setMessages(prev => [...prev, { type: 'user', content: message }]);
+        fetchAndShowDestinations();
       }
-      
-      if (days > 0) {
-        handleDurationSelect(days);
-        return;
-      }
-    }
-
-    // When user says "help me plan a trip" or similar, ask for duration first
-    if (message.toLowerCase().includes('help me plan') || 
-        message.toLowerCase().includes('plan a trip') || 
-        message.toLowerCase().includes('create itinerary') ||
-        message.toLowerCase().includes('yes')) {
-      
-      // Always ask for duration first before anything else
-      const durationMessage = {
-        type: 'bot',
-        content: 'Great! To start planning your trip, how many days will you be staying in Sri Lanka?',
-        suggestions: ['2 days', '3 days', '5 days', '7 days'],
-        expectingDuration: true
-      };
-      
-      setMessages(prev => [...prev, { type: 'user', content: message }, durationMessage]);
       return;
     }
     
     // Check for specific actions in the content
     if (message.toLowerCase().includes('show destinations') || 
         message.toLowerCase().includes('show places')) {
+      setMessages(prev => [...prev, { type: 'user', content: message }]);
       fetchAndShowDestinations();
       return;
     }
@@ -1283,12 +1318,38 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
     
     if (message.toLowerCase().includes('view my trip plan') ||
         message.toLowerCase().includes('generate my trip plan')) {
+      setMessages(prev => [...prev, { type: 'user', content: message }]);
       generateTripPlan();
       return;
     }
     
     if (message.toLowerCase().includes('start over')) {
+      setMessages(prev => [...prev, { type: 'user', content: message }]);
       handleReset();
+      return;
+    }
+    
+    // Check for Sri Lanka information request
+    if (message.toLowerCase().includes('about sri lanka') ||
+        message.toLowerCase().includes('tell me about sri') ||
+        message.toLowerCase().includes('what is sri lanka')) {
+      
+      // Add user message
+      setMessages(prev => [...prev, { 
+        type: 'user', 
+        content: message,
+        id: `user-srilanka-info-${Date.now()}`
+      }]);
+      
+      // Provide information about Sri Lanka
+      const sriLankaInfo = {
+        type: 'bot',
+        content: "Sri Lanka is a beautiful island nation in South Asia known for its stunning landscapes, rich history, and vibrant culture. You'll find pristine beaches, ancient rock fortresses, lush tea plantations, and wonderful wildlife. The country offers diverse experiences from relaxing by the ocean to discovering ancient ruins and immersing yourself in local traditions. Would you like me to help you plan a trip to experience Sri Lanka's beauty?",
+        suggestions: ['Help me plan a trip', 'Show available destinations', 'Tell me about local cuisine'],
+        id: `sri-lanka-info-${Date.now()}`
+      };
+      
+      setMessages(prev => [...prev, sriLankaInfo]);
       return;
     }
     
@@ -1907,152 +1968,217 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
     
     return (
       <Box sx={{ 
-        mb: 3, 
-        mt: 1,
-        p: 2.5,
-        bgcolor: 'white',
-        borderRadius: 3,
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
-        border: '1px solid rgba(226, 232, 240, 0.8)'
+        p: 2,
+        bgcolor: isDarkMode ? '#2D3748' : 'white',
+        borderRadius: 2,
+        boxShadow: isDarkMode ? '0 4px 12px rgba(0, 0, 0, 0.25)' : '0 4px 12px rgba(0, 0, 0, 0.1)',
+        border: '1px solid',
+        borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)'
       }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-          <Typography variant="h6" sx={{ color: '#2D3748', fontWeight: 700, fontSize: '1.1rem' }}>
-            Trip Planning Progress
-          </Typography>
-          <Chip 
-            label={`${daysPlanned} of ${tripDuration} days planned`} 
-            sx={{ 
-              bgcolor: 'rgba(79, 209, 197, 0.1)', 
-              color: '#2C7A7B',
-              fontWeight: 600,
-              borderRadius: 2
-            }} 
-          />
-        </Box>
-        
-        {/* Linear progress representation */}
-        <Box sx={{ position: 'relative', mb: 1.5 }}>
-          <Box sx={{ 
-            width: '100%', 
-            height: 10, 
-            bgcolor: 'rgba(226, 232, 240, 0.6)', 
-            borderRadius: 5,
-            overflow: 'hidden',
-            position: 'relative'
-          }}>
-            <Box sx={{ 
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: `${progressPercent}%`,
-              height: '100%',
-              bgcolor: '#4FD1C5',
-              borderRadius: 5,
-              transition: 'width 1s ease-in-out'
-            }} />
-          </Box>
-          {progressPercent === 100 && (
-            <Box 
-              component="span" 
+        {/* Visitor type indicator */}
+        {visitorType && (
+          <Box sx={{ mb: 2, pb: 2, borderBottom: '1px solid', borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }}>
+            <Typography variant="subtitle2" sx={{ color: isDarkMode ? '#A0AEC0' : '#718096', mb: 0.5, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.5px' }}>
+              VISITOR TYPE
+            </Typography>
+            <Chip 
+              label={visitorType === 'returning' ? 'Returning Visitor' : 'First-time Visitor'} 
+              size="small"
               sx={{ 
-                position: 'absolute', 
-                right: -5, 
-                top: -10,
-                animation: 'pulse 1.5s infinite',
-                '@keyframes pulse': {
-                  '0%': { transform: 'scale(1)' },
-                  '50%': { transform: 'scale(1.2)' },
-                  '100%': { transform: 'scale(1)' }
-                }
-              }}
-            >
-              ✅
-            </Box>
+                bgcolor: visitorType === 'returning' 
+                  ? (isDarkMode ? 'rgba(154, 230, 180, 0.2)' : 'rgba(154, 230, 180, 0.3)') 
+                  : (isDarkMode ? 'rgba(144, 205, 244, 0.2)' : 'rgba(144, 205, 244, 0.3)'),
+                color: visitorType === 'returning' 
+                  ? (isDarkMode ? '#9AE6B4' : '#38A169') 
+                  : (isDarkMode ? '#90CDF4' : '#2B6CB0'),
+                fontWeight: 600,
+                borderRadius: 1,
+                height: '24px',
+                fontSize: '0.75rem'
+              }} 
+            />
+            <Typography variant="body2" sx={{ 
+              color: isDarkMode ? '#CBD5E0' : '#4A5568', 
+              mt: 1, 
+              fontSize: '0.8rem', 
+              fontStyle: 'italic' 
+            }}>
+              {visitorType === 'returning' 
+                ? 'Recommendations tailored for experienced visitors' 
+                : 'Focusing on essential highlights for first-time visitors'}
+            </Typography>
+          </Box>
+        )}
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+          <Typography variant="subtitle1" sx={{ color: isDarkMode ? '#E2E8F0' : '#2D3748', fontWeight: 700, fontSize: '0.95rem' }}>
+            Trip Planning
+          </Typography>
+          {tripDuration > 0 && (
+            <Chip 
+              label={`${daysPlanned}/${tripDuration} days`} 
+              size="small"
+              sx={{ 
+                bgcolor: isDarkMode ? 'rgba(79, 209, 197, 0.2)' : 'rgba(79, 209, 197, 0.1)', 
+                color: isDarkMode ? '#4FD1C5' : '#2C7A7B',
+                fontWeight: 600,
+                borderRadius: 1,
+                height: '24px',
+                fontSize: '0.75rem'
+              }} 
+            />
           )}
         </Box>
         
-        {/* Day indicators */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'flex-start', 
-          flexWrap: 'wrap',
-          gap: 1
-        }}>
-          {Array.from({ length: tripDuration }, (_, i) => i + 1).map(day => {
-            const isCompleted = selectedDestinations[day] && selectedDestinations[day].length > 0;
-            const isCurrentDay = currentDay === day;
-            
-            return (
+        {/* Progress bar */}
+        {tripDuration > 0 && (
+          <Box sx={{ mb: 2, position: 'relative' }}>
+            <Box
+              sx={{
+                height: '8px',
+                borderRadius: '4px',
+                bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                overflow: 'hidden',
+                position: 'relative'
+              }}
+            >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  height: '100%',
+                  width: `${progressPercent}%`,
+                  bgcolor: '#4FD1C5',
+                  borderRadius: '4px',
+                  transition: 'width 0.5s ease-in-out'
+                }}
+              />
+            </Box>
+            {progressPercent === 100 && (
               <Box 
-                key={day}
-                onClick={() => {
-                  // Only allow clicking on completed days or current day
-                  if (isCompleted || day === daysPlanned + 1 || isCurrentDay) {
-                    setCurrentDay(day);
-                    fetchAndShowDestinations();
+                component="span" 
+                sx={{ 
+                  position: 'absolute', 
+                  right: -5, 
+                  top: -10,
+                  animation: 'pulse 1.5s infinite',
+                  '@keyframes pulse': {
+                    '0%': { transform: 'scale(1)' },
+                    '50%': { transform: 'scale(1.2)' },
+                    '100%': { transform: 'scale(1)' }
                   }
                 }}
-                sx={{
-                  width: 36,
-                  height: 36,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem',
-                  borderRadius: '50%',
-                  transition: 'all 0.3s ease',
-                  cursor: isCompleted || day === daysPlanned + 1 || isCurrentDay ? 'pointer' : 'default',
-                  opacity: isCompleted || day === daysPlanned + 1 || isCurrentDay ? 1 : 0.6,
-                  bgcolor: isCurrentDay 
-                    ? '#4FD1C5' 
-                    : isCompleted 
-                      ? 'rgba(79, 209, 197, 0.15)' 
-                      : 'rgba(226, 232, 240, 0.6)',
-                  color: isCurrentDay 
-                    ? 'white' 
-                    : isCompleted 
-                      ? '#2C7A7B' 
-                      : '#718096',
-                  border: isCurrentDay 
-                    ? '2px solid #38A89D' 
-                    : isCompleted 
-                      ? '2px solid rgba(79, 209, 197, 0.5)' 
-                      : '1px solid transparent',
-                  boxShadow: isCurrentDay 
-                    ? '0 2px 6px rgba(79, 209, 197, 0.3)' 
-                    : 'none',
-                  '&:hover': {
-                    transform: isCompleted || day === daysPlanned + 1 || isCurrentDay 
-                      ? 'translateY(-2px)' 
-                      : 'none',
-                    boxShadow: isCompleted || day === daysPlanned + 1 || isCurrentDay 
-                      ? '0 3px 8px rgba(0,0,0,0.1)' 
-                      : 'none'
-                  },
-                  position: 'relative'
-                }}
               >
-                {day}
-                {isCompleted && (
-                  <Box 
-                    sx={{ 
-                      position: 'absolute', 
-                      bottom: -2, 
-                      right: -2, 
-                      width: 14, 
-                      height: 14, 
-                      borderRadius: '50%', 
-                      bgcolor: '#68D391',
-                      border: '2px solid white',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                    }}
-                  />
-                )}
+                ✅
               </Box>
-            );
-          })}
-        </Box>
+            )}
+          </Box>
+        )}
+        
+        {/* Day indicators - compact version for sidebar */}
+        {tripDuration > 0 && (
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'flex-start', 
+            flexWrap: 'wrap',
+            gap: '8px',
+            mb: 2
+          }}>
+            {Array.from({ length: tripDuration }, (_, i) => i + 1).map(day => {
+              const isPlanned = selectedDestinations[day] && selectedDestinations[day].length > 0;
+              const hasAccommodation = selectedAccommodation[day];
+              
+              return (
+                <Box
+                  key={`day-indicator-${day}`}
+                  sx={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    bgcolor: isPlanned 
+                      ? (isDarkMode ? 'rgba(79, 209, 197, 0.8)' : '#4FD1C5') 
+                      : (isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'),
+                    color: isPlanned 
+                      ? (isDarkMode ? '#1A202C' : 'white')
+                      : (isDarkMode ? '#A0AEC0' : '#718096'),
+                    border: hasAccommodation ? '2px solid' : 'none',
+                    borderColor: isDarkMode ? '#9AE6B4' : '#38A169',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    position: 'relative',
+                    '&:hover': {
+                      transform: 'scale(1.1)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }
+                  }}
+                  onClick={() => {
+                    setCurrentDay(day);
+                    // Show destinations for this day if not already selected
+                    if (!isPlanned) {
+                      fetchAndShowDestinations();
+                    }
+                  }}
+                >
+                  {day}
+                  {currentDay === day && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        border: '2px solid',
+                        borderColor: isDarkMode ? '#4FD1C5' : '#38A89D',
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+        
+        {/* Destination summary if some exist */}
+        {Object.keys(selectedDestinations).length > 0 && (
+          <Box>
+            <Typography variant="subtitle2" sx={{ 
+              color: isDarkMode ? '#A0AEC0' : '#718096', 
+              fontSize: '0.75rem', 
+              fontWeight: 700, 
+              mb: 1,
+              letterSpacing: '0.5px'
+            }}>
+              PLANNED DESTINATIONS
+            </Typography>
+            <Box sx={{ maxHeight: '150px', overflowY: 'auto', pr: 1 }}>
+              {Object.entries(selectedDestinations).map(([day, dests]) => (
+                <Box key={`day-summary-${day}`} sx={{ mb: 1 }}>
+                  <Typography variant="caption" sx={{ 
+                    color: isDarkMode ? '#CBD5E0' : '#4A5568',
+                    fontWeight: 600 
+                  }}>
+                    Day {day}:
+                  </Typography>
+                  <Typography variant="body2" sx={{ 
+                    color: isDarkMode ? '#E2E8F0' : '#2D3748',
+                    fontSize: '0.8rem',
+                    ml: 1 
+                  }}>
+                    {dests.map(d => d.name).join(', ')}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
       </Box>
     );
   };
@@ -2286,248 +2412,271 @@ const ChatInterface = ({ onTripPlanGenerated }) => {
     return 'Accessible with local transportation options, best enjoyed during daylight hours';
   };
 
-  return (
-    <Box sx={{ 
-      height: '100vh', // Make it full viewport height
-      display: 'flex', 
-      flexDirection: 'column', 
-      bgcolor: '#f0f5f9',
-      maxWidth: '1400px',
-      mx: 'auto',
-      boxShadow: '0 0 20px rgba(0,0,0,0.1)',
-      borderRadius: { xs: 0, md: 3 },
-      overflow: 'hidden',
-      mt: { xs: 0, md: 3 },
-      mb: { xs: 0, md: 3 }
-    }}>
-      {/* Header */}
-      <Box sx={{ 
-        p: 2.5, 
-        bgcolor: '#4FD1C5', 
-        color: 'white', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-        borderBottom: '1px solid rgba(255,255,255,0.2)'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <TravelExploreIcon sx={{ mr: 2, fontSize: '2rem' }} />
-          <Typography variant="h5" sx={{ 
-            fontFamily: "'Poppins', sans-serif", 
-            fontWeight: 600,
-            letterSpacing: '0.5px',
-            textShadow: '1px 1px 2px rgba(0,0,0,0.1)'
-          }}>
-            Ceylon Circuit AI Travel Planner
-          </Typography>
-        </Box>
-        <IconButton 
-          color="inherit" 
-          onClick={handleReset} 
-          title="Start New Chat"
-          sx={{ 
-            bgcolor: 'rgba(255,255,255,0.15)', 
-            '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <RefreshIcon />
-        </IconButton>
-      </Box>
+  // Fix dependencies in useEffect
+  useEffect(() => {
+    // Initial setup and data fetching
+    if (availableDestinations.length === 0) {
+      fetchDestinations();
+    }
+    // Add DATABASE_DESTINATIONS to dependencies
+  }, [availableDestinations.length, DATABASE_DESTINATIONS, fetchDestinations]);
 
-      {/* Chat messages */}
-      <Box sx={{ 
-        flexGrow: 1, 
-        overflow: 'auto', 
-        p: { xs: 2, md: 4 },
-        pt: { xs: 3, md: 5 },
+  // Also update the filterMessageContent function to avoid warnings in bot messages
+  const filterMessageContent = (content, isFromBot = false) => {
+    // If message comes from the bot, don't add warnings
+    if (isFromBot) {
+      return content;
+    }
+    
+    // List of destinations not in our database that we should highlight warnings for
+    const nonDbDestinations = [
+      'Anuradhapura', 'Polonnaruwa', 'Dambulla', 'Nuwara Eliya', 'Colombo', 
+      'Jaffna', 'Trincomalee', 'Arugam Bay', 'Negombo', 'Hikkaduwa', 
+      'Batticaloa', 'Unawatuna', 'Bentota', 'Matara', 'Beruwala', 'Kandy'
+    ];
+    
+    let filteredContent = content;
+    
+    // Check if content mentions any non-database destinations
+    const mentionedNonDbDests = nonDbDestinations.filter(dest => 
+      content.toLowerCase().includes(dest.toLowerCase())
+    );
+    
+    if (mentionedNonDbDests.length > 0) {
+      // Add a warning to the message content
+      filteredContent += `\n\n⚠️ Note: ${mentionedNonDbDests.join(', ')} ${mentionedNonDbDests.length === 1 ? 'is not a destination' : 'are not destinations'} in our database. Please select from the available destinations shown in the cards.`;
+    }
+    
+    return filteredContent;
+  };
+
+  // Update the ChatMessage component to use our modified filterMessageContent
+  const enrichMessage = (message) => {
+    if (!message) return message;
+    
+    // If the message is from a bot, don't modify it
+    if (message.type === 'bot') return message;
+    
+    // Apply content filtering only to user messages
+    return {
+      ...message,
+      content: filterMessageContent(message.content, false)
+    };
+  };
+
+  // Use the updated filterMessageContent to process bot messages
+  const enhanceMessageContent = (message) => {
+    if (!message || typeof message !== 'string') return message;
+    
+    // Simple enhancement for bot messages (no warnings)
+    return message.trim();
+  };
+
+  return (
+    <Box
+      sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 3,
-        bgcolor: '#f0f5f9',
-        height: 'calc(100vh - 140px)' // Adjust to leave space for header and input
-      }}>
-        {messages.map((message, index) => (
-          <React.Fragment key={index}>
-            <ChatMessage 
-              message={message} 
-              onSuggestionClick={(suggestion) => processMessage(suggestion)} 
-            />
-            
-            {message.showDestinations && (
-              <Box sx={{ width: '100%' }}>
-                {renderPlanningProgress()}
-                {renderDestinationCards()}
-              </Box>
-            )}
-            
-            {message.showAccommodations && (
-              <Box sx={{ width: '100%' }}>
-                {renderAccommodationCards(message.accommodations)}
-              </Box>
-            )}
-          </React.Fragment>
-        ))}
-        
-        {/* Generate Trip Plan Button */}
-        {showTripPlanButton && Object.values(selectedDestinations).some(arr => arr.length > 0) && (
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            my: 3,
-            p: 3,
-            bgcolor: 'rgba(79, 209, 197, 0.1)',
-            borderRadius: 3,
-            border: '1px dashed #4FD1C5',
-            boxShadow: '0 4px 12px rgba(79, 209, 197, 0.15)',
+        height: '100%',
+        width: '100%',
+        position: 'relative',
+        bgcolor: isDarkMode ? '#1E1E1E' : '#ffffff',
+        m: 0,
+        p: 0,
+        overflow: 'hidden'
+      }}
+    >
+      {/* Main content container with side padding */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'row',
+          height: '100%',
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {/* Chat content with padding */}
+        <Box
+          sx={{
+            flexGrow: 1,
+            height: '100%',
+            px: { xs: 2, sm: 4, md: 6 },
+            maxWidth: { xs: '100%', md: planningMode ? 'calc(100% - 320px)' : '100%' },
             transition: 'all 0.3s ease',
-            '&:hover': {
-              boxShadow: '0 6px 16px rgba(79, 209, 197, 0.25)',
-              bgcolor: 'rgba(79, 209, 197, 0.15)',
-            }
-          }}>
-            <Button
-              variant="contained"
-              startIcon={<ArticleIcon />}
-              onClick={() => generateTripPlan()}
-              sx={{
-                bgcolor: '#4FD1C5',
-                '&:hover': {
-                  bgcolor: '#38A89D',
-                },
-                boxShadow: '0 4px 10px rgba(79, 209, 197, 0.3)',
-                fontWeight: 600,
-                px: 4,
-                py: 1.5,
-                fontSize: '1rem',
-                borderRadius: 2
-              }}
-              disabled={!tripDuration || Object.keys(selectedDestinations).length < tripDuration}
-            >
-              Generate My {tripDuration}-Day Trip Plan
-            </Button>
-            
-            {(!tripDuration || Object.keys(selectedDestinations).length < tripDuration) && (
-              <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-                Please complete planning for all {tripDuration} days before generating your trip plan
-              </Typography>
-            )}
-          </Box>
-        )}
-        
-        {planningMode && currentDay > tripDuration && (
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            my: 3,
-            p: 3,
-            bgcolor: 'rgba(79, 209, 197, 0.1)',
-            borderRadius: 3,
-            border: '1px dashed #4FD1C5'
-          }}>
-            <Button
-              variant="contained"
-              startIcon={<ArticleIcon />}
-              onClick={() => generateTripPlan()}
-              sx={{
-                bgcolor: '#4FD1C5',
-                '&:hover': {
-                  bgcolor: '#38A89D',
-                },
-                boxShadow: '0 4px 10px rgba(79, 209, 197, 0.3)',
-                fontWeight: 600,
-                px: 4,
-                py: 1.5,
-                fontSize: '1rem',
-                borderRadius: 2
-              }}
-              disabled={!tripDuration || Object.keys(selectedDestinations).length < tripDuration}
-            >
-              Generate My {tripDuration}-Day Trip Plan
-            </Button>
-          </Box>
-        )}
-        
-        {error && (
-          <Alert 
-            severity="error" 
-            sx={{ 
-              mb: 3,
-              borderRadius: 2,
-              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.2)'
+            position: 'relative'
+          }}
+        >
+          {/* Messages container */}
+          <Box
+            sx={{
+              flexGrow: 1,
+              overflowY: 'auto',
+              pt: 2,
+              pb: '100px', // Reduced bottom padding to prevent overlap
+              height: '100%',
+              width: '100%',
+              boxSizing: 'border-box',
+              m: 0
             }}
           >
-            {error}
-          </Alert>
-        )}
-        
-        <div ref={messagesEndRef} />
-      </Box>
+            {messages.map((msg) => (
+              <ChatMessage
+                key={msg.id || `msg-${Date.now()}-${Math.random()}`}
+                message={enrichMessage(msg)}
+                onSuggestionClick={handleSendMessage}
+                isDarkMode={isDarkMode}
+              />
+            ))}
+            
+            {isLoading && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  mt: 2
+                }}
+              >
+                <CircularProgress size={24} sx={{ color: isDarkMode ? '#4FD1C5' : '#4FD1C5' }} />
+                <Typography variant="body2" sx={{ color: isDarkMode ? '#A0AEC0' : '#718096' }}>
+                  Thinking...
+                </Typography>
+              </Box>
+            )}
 
-      {/* Loading indicator */}
-      {isLoading && (
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          mb: 3, 
-          py: 2 
-        }}>
-          <CircularProgress size={30} sx={{ color: '#4FD1C5' }} />
-        </Box>
-      )}
+            {error && (
+              <Alert
+                severity="error"
+                sx={{
+                  mt: 2,
+                  bgcolor: isDarkMode ? 'rgba(254, 178, 178, 0.15)' : undefined,
+                  color: isDarkMode ? '#FC8181' : undefined
+                }}
+              >
+                {error}
+              </Alert>
+            )}
 
-      {/* Input area */}
-      <Box sx={{ 
-        p: 2.5, 
-        bgcolor: 'white', 
-        borderTop: 1, 
-        borderColor: 'rgba(0,0,0,0.08)',
-        boxShadow: '0 -2px 10px rgba(0,0,0,0.05)',
-        position: 'relative'
-      }}>
-        {messages.length === 1 && (
-          <Box sx={{
-            position: 'absolute',
-            top: -40,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            bgcolor: 'rgba(79, 209, 197, 0.9)',
-            color: 'white',
-            py: 1,
-            px: 2,
-            borderRadius: 2,
-            fontSize: '0.9rem',
-            fontWeight: 500,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            animation: 'bounce 2s infinite',
-            '&::after': {
-              content: '""',
+            {/* Invisible element for scroll anchoring */}
+            <div ref={messagesEndRef} style={{ height: 1 }} />
+          </Box>
+
+          {/* Input section - fixed at bottom with proper z-index */}
+          <Box
+            sx={{
+              p: { xs: 2, sm: 3 },
+              pt: 1.5,
               position: 'absolute',
-              bottom: -8,
-              left: '50%',
-              marginLeft: -8,
-              borderWidth: 8,
-              borderStyle: 'solid',
-              borderColor: 'rgba(79, 209, 197, 0.9) transparent transparent transparent'
-            },
-            '@keyframes bounce': {
-              '0%, 100%': { transform: 'translateX(-50%) translateY(0)' },
-              '50%': { transform: 'translateX(-50%) translateY(-10px)' }
-            }
-          }}>
-            Type your response here or use suggestions
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: isDarkMode ? '#1E1E1E' : '#ffffff',
+              borderTop: '1px solid',
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+              boxShadow: isDarkMode 
+                ? '0 -4px 20px rgba(0, 0, 0, 0.5)' 
+                : '0 -4px 20px rgba(0, 0, 0, 0.06)',
+              zIndex: 10,
+              width: '100%',
+              boxSizing: 'border-box',
+              m: 0
+            }}
+          >
+            {/* Trip plan button */}
+            {showTripPlanButton && !planningMode && (
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: isDarkMode ? 'rgba(79, 209, 197, 0.1)' : 'rgba(79, 209, 197, 0.08)',
+                  border: '1px solid',
+                  borderColor: isDarkMode ? 'rgba(79, 209, 197, 0.2)' : 'rgba(79, 209, 197, 0.15)'
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      fontWeight: 500,
+                      color: isDarkMode ? '#4FD1C5' : '#2C7A7B'
+                    }}
+                  >
+                    Ready to generate your trip plan?
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={generateTripPlan}
+                    disabled={isLoading}
+                    sx={{
+                      bgcolor: '#4FD1C5',
+                      '&:hover': {
+                        bgcolor: '#38A89D'
+                      },
+                      px: 3
+                    }}
+                  >
+                    Generate Plan
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+            {/* Chat input */}
+            <ChatInput
+              onSend={handleSendMessage}
+              disabled={isLoading}
+              autoFocus={true}
+              isDarkMode={isDarkMode}
+              placeholder="Type your message..."
+            />
+          </Box>
+        </Box>
+
+        {/* Side panel for planning progress */}
+        {planningMode && (
+          <Box
+            sx={{
+              width: { xs: '100%', md: '300px' },
+              display: { xs: 'none', md: 'block' },
+              height: '100%',
+              borderLeft: '1px solid',
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+              p: 2,
+              bgcolor: isDarkMode ? '#1A202C' : '#f7f7f7',
+              overflow: 'auto'
+            }}
+          >
+            {renderPlanningProgress()}
           </Box>
         )}
-        
-        {/* Replace TextField with ChatInput component */}
-        <ChatInput 
-          onSend={handleSendMessage}
-          disabled={isLoading}
-          autoFocus={true}
-          placeholder="Type your message..."
-        />
       </Box>
+
+      {/* Floating planning progress panel for mobile */}
+      {planningMode && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            width: { xs: '90%', sm: '300px' },
+            maxWidth: { xs: 'calc(100% - 32px)', sm: '300px' },
+            zIndex: 20,
+            opacity: 0.95,
+            transition: 'all 0.3s ease',
+            transform: { xs: 'translateY(0)', sm: 'translateY(0)' },
+            borderRadius: 2,
+            overflow: 'hidden',
+            boxShadow: isDarkMode 
+              ? '0 4px 20px rgba(0, 0, 0, 0.4)' 
+              : '0 4px 20px rgba(0, 0, 0, 0.15)',
+            display: { xs: 'block', md: 'none' },
+          }}
+        >
+          {renderPlanningProgress()}
+        </Box>
+      )}
     </Box>
   );
 };
